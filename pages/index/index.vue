@@ -24,7 +24,22 @@
           <text class="countdown-text">距离活动结束还有{{ daysLeft }}天</text>
         </view>
       </view>
-      <view class="tab1-content">
+      <view class="tab1-content" id="map-container">
+        <!-- Route Canvas for Lines -->
+        <canvas canvas-id="routeCanvas" id="routeCanvas" class="route-canvas"></canvas>
+        
+        <!-- Checkpoint Markers -->
+        <view 
+          v-for="(cp, index) in checkpoints" 
+          :key="index"
+          class="checkpoint"
+          :class="[
+            (index === 0 || index === checkpoints.length - 1) ? 'checkpoint-star' : 'checkpoint-dot'
+          ]"
+          :style="{ left: cp.x + '%', top: cp.y + '%' }"
+        >
+          <text class="cp-star" v-if="index === 0 || index === checkpoints.length - 1">★</text>
+        </view>
       </view>
     </view>
 
@@ -122,7 +137,23 @@ export default {
       tempAvatarUrl: '',
       pendingSyncCode: '',
       pendingSyncEncryptedData: '',
-      pendingSyncIv: ''
+      pendingSyncIv: '',
+      // Map check points (1 to 13 based on the Long March route)
+      checkpoints: [
+        { x: 85, y: 80 }, // 1. Ruijin
+        { x: 65, y: 84 }, // 2. 
+        { x: 50, y: 73 }, // 3. (Moved up by roughly 3%)
+        { x: 36, y: 68 }, // 4. 
+        { x: 25, y: 75 }, // 5. 
+        { x: 15, y: 65 }, // 6. 
+        { x: 22, y: 56 }, // 7. 
+        { x: 15, y: 48 }, // 8. 
+        { x: 22, y: 40 }, // 9. 
+        { x: 16, y: 32 }, // 10. 
+        { x: 24, y: 24 }, // 11. 
+        { x: 35, y: 16 }, // 12. 
+        { x: 55, y: 10 }  // 13. Yan'an (pushed back slightly to avoid overlap)
+      ]
     }
   },
   computed: {
@@ -135,6 +166,12 @@ export default {
       const diff = this.endDate - now;
       const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
       return days > 0 ? days : 0;
+    },
+    currentCheckpointIndex() {
+      // 13 points = 12 segments. Calculate which points should be "lit up" based on total steps so far.
+      const ratio = this.todaysSteps / this.stepTarget;
+      const index = Math.floor(ratio * 13) + 1;
+      return index > 13 ? 13 : index;
     }
   },
   mounted() {
@@ -142,13 +179,140 @@ export default {
     const cached = uni.getStorageSync('userProfile');
     if (cached && cached.nickname) {
       this.userNickname = cached.nickname;
-      // Only restore avatar if it's a valid cloud:// URL — wxfile:// paths are
-      // device-local temp files that expire and must never be sent to the database.
       const av = cached.avatarUrl || '';
       this.userAvatarUrl = av.startsWith('cloud://') ? av : '';
     }
+    
+    // Draw the map path if starting on today tab
+    if (this.activeTab === 'today') {
+      this.$nextTick(() => {
+        setTimeout(() => {
+          this.drawMap();
+        }, 300);
+      });
+    }
   },
   methods: {
+    drawMap() {
+      const query = uni.createSelectorQuery().in(this);
+      query.select('#map-container').boundingClientRect(data => {
+        if (!data) return;
+        const width = data.width;
+        const height = data.height;
+        
+        const ctx = uni.createCanvasContext('routeCanvas', this);
+        ctx.clearRect(0, 0, width, height);
+
+        // Convert percentage coordinates to pixels
+        const points = this.checkpoints.map(cp => ({
+          x: (cp.x / 100) * width,
+          y: (cp.y / 100) * height
+        }));
+
+        // Draw lines between checkpoints
+        for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i];
+          const p2 = points[i + 1];
+
+          // Determine curve properties for specific segments
+          let isCurve = false;
+          let isSingleZig = false;
+          let cx = 0, cy = 0;
+
+          if (i === 0) {
+            // Bend line between 1 and 2 (index 0 and 1) downwards
+            isCurve = true;
+            cx = (p1.x + p2.x) / 2;
+            cy = Math.max(p1.y, p2.y) + 40;
+          } else if (i === 1) {
+            // Bend line between 2 and 3 slightly towards the bottom (reduced bend)
+            isCurve = true;
+            cx = (p1.x + p2.x) / 2;
+            cy = Math.max(p1.y, p2.y) + 12;
+          } else if (i === 3) {
+            // Bend line between 4 and 5, shifted further to the right
+            isCurve = true;
+            cx = (p1.x + p2.x) / 2 + 35; 
+            cy = Math.max(p1.y, p2.y) + 60; 
+          } else if (i === 11) {
+            // Reduced bend with a single sharp "zig" in the middle
+            isSingleZig = true;
+            cx = (p1.x + p2.x) / 2 - 5; // slight horizontal shift for the zig
+            cy = Math.min(p1.y, p2.y) - 25; // reduced bend (was -60)
+          }
+
+          // Leave clear gaps so lines don't touch points or arrowheads
+          // Reduced gaps to be tighter around the smaller dots
+          const startRadius = (i === 0) ? 14 : 8; 
+          const endRadius = (i + 1 === points.length - 1) ? 18 : 10; 
+          
+          let startX, startY, endX, endY, endAngle;
+
+          if (isCurve || isSingleZig) {
+            const angStart = Math.atan2(cy - p1.y, cx - p1.x);
+            startX = p1.x + startRadius * Math.cos(angStart);
+            startY = p1.y + startRadius * Math.sin(angStart);
+            
+            const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
+            endX = p2.x - endRadius * Math.cos(angEnd);
+            endY = p2.y - endRadius * Math.sin(angEnd);
+            endAngle = angEnd;
+          } else {
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            startX = p1.x + startRadius * Math.cos(angle);
+            startY = p1.y + startRadius * Math.sin(angle);
+            endX = p2.x - endRadius * Math.cos(angle);
+            endY = p2.y - endRadius * Math.sin(angle);
+            endAngle = angle;
+          }
+
+          // Stop the main line deep inside the arrowhead base so no rounded or square edge pokes out the tip
+          const lineEndX = endX - 10 * Math.cos(endAngle);
+          const lineEndY = endY - 10 * Math.sin(endAngle);
+
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          
+          if (isCurve) {
+            ctx.quadraticCurveTo(cx, cy, lineEndX, lineEndY);
+          } else if (isSingleZig) {
+            ctx.lineTo(cx, cy); // Draw the sharp zig point
+            ctx.lineTo(lineEndX, lineEndY);
+          } else {
+            ctx.lineTo(lineEndX, lineEndY);
+          }
+          
+          // Thicker, solid yellow line (removed round cap to keep corners sharp)
+          ctx.setStrokeStyle('#f5d76e');
+          ctx.setLineWidth(5);
+          ctx.stroke();
+
+          if (i === 11) {
+            // Draw a small checkpoint image instead of an arrowhead for the last arrow
+            const imgSize = 24;
+            ctx.drawImage('/static/checkpoint.png', endX - imgSize/2, endY - imgSize/2, imgSize, imgSize);
+          } else {
+            // Draw regular arrowhead exactly at endX, endY
+            const arrowLength = 14;
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+              endX - arrowLength * Math.cos(endAngle - Math.PI / 6),
+              endY - arrowLength * Math.sin(endAngle - Math.PI / 6)
+            );
+            ctx.lineTo(
+              endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
+              endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
+            );
+            ctx.closePath(); // Closes the triangle cleanly for sharp points
+            ctx.fillStyle = '#f5d76e';
+            ctx.fill();
+          }
+        }
+        
+        ctx.draw();
+      }).exec();
+    },
     loadLocalData() {
       const savedSteps = uni.getStorageSync('totalStepsHistory');
       if (savedSteps) {
@@ -167,6 +331,12 @@ export default {
       this.activeTab = tab;
       if (tab === 'period') {
         this.fetchLeaderboard();
+      } else if (tab === 'today') {
+        this.$nextTick(() => {
+          setTimeout(() => {
+            this.drawMap();
+          }, 300);
+        });
       }
     },
     fetchLeaderboard() {
@@ -435,22 +605,22 @@ page {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24rpx 32rpx 16rpx;
+  padding: 16rpx 32rpx 8rpx;
 }
 
 .title-image {
-  width: 100%;
+  width: 85%; /* Reduced to give more space for map */
 }
 
 .countdown-badge {
-  margin-top: 16rpx;
+  margin-top: 10rpx;
   background-color: #f5d76e;
   border-radius: 100rpx;
-  padding: 10rpx 36rpx;
+  padding: 6rpx 24rpx;
 }
 
 .countdown-text {
-  font-size: 26rpx;
+  font-size: 22rpx; /* Reduced by ~5px equivalent to prevent overlap */
   color: #2d6040;
   font-weight: 600;
 }
@@ -458,8 +628,44 @@ page {
 .tab1-content {
   flex: 1;
   display: flex;
+  position: relative;
+  width: 100%;
+}
+
+.route-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.checkpoint {
+  position: absolute;
+  display: flex;
   align-items: center;
   justify-content: center;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.checkpoint-dot {
+  width: 12rpx; /* approx 5px-6px */
+  height: 12rpx;
+  background-color: #660000;
+  border-radius: 50%;
+}
+
+.checkpoint-star {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.cp-star {
+  font-size: 40rpx;
+  color: #660000; /* Dark red star */
 }
 
 /* ── Tab 2 ── */

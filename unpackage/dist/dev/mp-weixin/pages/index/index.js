@@ -19,7 +19,36 @@ const _sfc_main = {
       tempAvatarUrl: "",
       pendingSyncCode: "",
       pendingSyncEncryptedData: "",
-      pendingSyncIv: ""
+      pendingSyncIv: "",
+      // Map check points (1 to 13 based on the Long March route)
+      checkpoints: [
+        { x: 85, y: 80 },
+        // 1. Ruijin
+        { x: 65, y: 84 },
+        // 2. 
+        { x: 50, y: 73 },
+        // 3. (Moved up by roughly 3%)
+        { x: 36, y: 68 },
+        // 4. 
+        { x: 25, y: 75 },
+        // 5. 
+        { x: 15, y: 65 },
+        // 6. 
+        { x: 22, y: 56 },
+        // 7. 
+        { x: 15, y: 48 },
+        // 8. 
+        { x: 22, y: 40 },
+        // 9. 
+        { x: 16, y: 32 },
+        // 10. 
+        { x: 24, y: 24 },
+        // 11. 
+        { x: 35, y: 16 },
+        // 12. 
+        { x: 55, y: 10 }
+        // 13. Yan'an (pushed back slightly to avoid overlap)
+      ]
     };
   },
   computed: {
@@ -32,6 +61,11 @@ const _sfc_main = {
       const diff = this.endDate - now;
       const days = Math.ceil(diff / (1e3 * 60 * 60 * 24));
       return days > 0 ? days : 0;
+    },
+    currentCheckpointIndex() {
+      const ratio = this.todaysSteps / this.stepTarget;
+      const index = Math.floor(ratio * 13) + 1;
+      return index > 13 ? 13 : index;
     }
   },
   mounted() {
@@ -42,8 +76,108 @@ const _sfc_main = {
       const av = cached.avatarUrl || "";
       this.userAvatarUrl = av.startsWith("cloud://") ? av : "";
     }
+    if (this.activeTab === "today") {
+      this.$nextTick(() => {
+        setTimeout(() => {
+          this.drawMap();
+        }, 300);
+      });
+    }
   },
   methods: {
+    drawMap() {
+      const query = common_vendor.index.createSelectorQuery().in(this);
+      query.select("#map-container").boundingClientRect((data) => {
+        if (!data)
+          return;
+        const width = data.width;
+        const height = data.height;
+        const ctx = common_vendor.index.createCanvasContext("routeCanvas", this);
+        ctx.clearRect(0, 0, width, height);
+        const points = this.checkpoints.map((cp) => ({
+          x: cp.x / 100 * width,
+          y: cp.y / 100 * height
+        }));
+        for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          let isCurve = false;
+          let isSingleZig = false;
+          let cx = 0, cy = 0;
+          if (i === 0) {
+            isCurve = true;
+            cx = (p1.x + p2.x) / 2;
+            cy = Math.max(p1.y, p2.y) + 40;
+          } else if (i === 1) {
+            isCurve = true;
+            cx = (p1.x + p2.x) / 2;
+            cy = Math.max(p1.y, p2.y) + 12;
+          } else if (i === 3) {
+            isCurve = true;
+            cx = (p1.x + p2.x) / 2 + 35;
+            cy = Math.max(p1.y, p2.y) + 60;
+          } else if (i === 11) {
+            isSingleZig = true;
+            cx = (p1.x + p2.x) / 2 - 5;
+            cy = Math.min(p1.y, p2.y) - 25;
+          }
+          const startRadius = i === 0 ? 14 : 8;
+          const endRadius = i + 1 === points.length - 1 ? 18 : 10;
+          let startX, startY, endX, endY, endAngle;
+          if (isCurve || isSingleZig) {
+            const angStart = Math.atan2(cy - p1.y, cx - p1.x);
+            startX = p1.x + startRadius * Math.cos(angStart);
+            startY = p1.y + startRadius * Math.sin(angStart);
+            const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
+            endX = p2.x - endRadius * Math.cos(angEnd);
+            endY = p2.y - endRadius * Math.sin(angEnd);
+            endAngle = angEnd;
+          } else {
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            startX = p1.x + startRadius * Math.cos(angle);
+            startY = p1.y + startRadius * Math.sin(angle);
+            endX = p2.x - endRadius * Math.cos(angle);
+            endY = p2.y - endRadius * Math.sin(angle);
+            endAngle = angle;
+          }
+          const lineEndX = endX - 10 * Math.cos(endAngle);
+          const lineEndY = endY - 10 * Math.sin(endAngle);
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          if (isCurve) {
+            ctx.quadraticCurveTo(cx, cy, lineEndX, lineEndY);
+          } else if (isSingleZig) {
+            ctx.lineTo(cx, cy);
+            ctx.lineTo(lineEndX, lineEndY);
+          } else {
+            ctx.lineTo(lineEndX, lineEndY);
+          }
+          ctx.setStrokeStyle("#f5d76e");
+          ctx.setLineWidth(5);
+          ctx.stroke();
+          if (i === 11) {
+            const imgSize = 24;
+            ctx.drawImage("/static/checkpoint.png", endX - imgSize / 2, endY - imgSize / 2, imgSize, imgSize);
+          } else {
+            const arrowLength = 14;
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+              endX - arrowLength * Math.cos(endAngle - Math.PI / 6),
+              endY - arrowLength * Math.sin(endAngle - Math.PI / 6)
+            );
+            ctx.lineTo(
+              endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
+              endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = "#f5d76e";
+            ctx.fill();
+          }
+        }
+        ctx.draw();
+      }).exec();
+    },
     loadLocalData() {
       const savedSteps = common_vendor.index.getStorageSync("totalStepsHistory");
       if (savedSteps) {
@@ -62,6 +196,12 @@ const _sfc_main = {
       this.activeTab = tab;
       if (tab === "period") {
         this.fetchLeaderboard();
+      } else if (tab === "today") {
+        this.$nextTick(() => {
+          setTimeout(() => {
+            this.drawMap();
+          }, 300);
+        });
       }
     },
     fetchLeaderboard() {
@@ -74,7 +214,7 @@ const _sfc_main = {
           this.leaderboardLoading = false;
         },
         fail: (err) => {
-          common_vendor.index.__f__("error", "at pages/index/index.vue:184", "Leaderboard fetch failed:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:354", "Leaderboard fetch failed:", err);
           this.leaderboardLoading = false;
         }
       });
@@ -131,7 +271,7 @@ const _sfc_main = {
             fail(err) {
               common_vendor.index.hideLoading();
               common_vendor.index.showToast({ title: "读取数据失败", icon: "none" });
-              common_vendor.index.__f__("error", "at pages/index/index.vue:240", err);
+              common_vendor.index.__f__("error", "at pages/index/index.vue:410", err);
             }
           });
         },
@@ -155,7 +295,7 @@ const _sfc_main = {
             that._uploadLocalFileAndSync(dlRes.tempFilePath, nickname);
           },
           fail: (err) => {
-            common_vendor.index.__f__("error", "at pages/index/index.vue:266", "Avatar download failed:", err);
+            common_vendor.index.__f__("error", "at pages/index/index.vue:436", "Avatar download failed:", err);
             common_vendor.index.hideLoading();
             that.doSync(nickname, "");
           }
@@ -180,7 +320,7 @@ const _sfc_main = {
           that.doSync(nickname, cloudUrl);
         },
         fail: (err) => {
-          common_vendor.index.__f__("error", "at pages/index/index.vue:291", "Avatar upload failed:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:461", "Avatar upload failed:", err);
           common_vendor.index.hideLoading();
           that.doSync(nickname, "");
         }
@@ -203,13 +343,13 @@ const _sfc_main = {
             common_vendor.index.showToast({ title: "步数已更新！", icon: "success" });
           } else {
             common_vendor.index.showToast({ title: res.result.msg || "出错了，请重试", icon: "none" });
-            common_vendor.index.__f__("error", "at pages/index/index.vue:314", "syncSteps failed:", res.result);
+            common_vendor.index.__f__("error", "at pages/index/index.vue:484", "syncSteps failed:", res.result);
           }
         },
         fail: (err) => {
           common_vendor.index.hideLoading();
           common_vendor.index.showToast({ title: "同步失败，请重试", icon: "none" });
-          common_vendor.index.__f__("error", "at pages/index/index.vue:320", "callFunction fail:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:490", "callFunction fail:", err);
         }
       });
     }
@@ -225,13 +365,23 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
     f: $data.activeTab === "today"
   }, $data.activeTab === "today" ? {
     g: common_assets._imports_1,
-    h: common_vendor.t($options.daysLeft)
+    h: common_vendor.t($options.daysLeft),
+    i: common_vendor.f($data.checkpoints, (cp, index, i0) => {
+      return common_vendor.e({
+        a: index === 0 || index === $data.checkpoints.length - 1
+      }, index === 0 || index === $data.checkpoints.length - 1 ? {} : {}, {
+        b: index,
+        c: common_vendor.n(index === 0 || index === $data.checkpoints.length - 1 ? "checkpoint-star" : "checkpoint-dot"),
+        d: cp.x + "%",
+        e: cp.y + "%"
+      });
+    })
   } : {}, {
-    i: $data.activeTab === "period"
+    j: $data.activeTab === "period"
   }, $data.activeTab === "period" ? common_vendor.e({
-    j: $data.leaderboardLoading
+    k: $data.leaderboardLoading
   }, $data.leaderboardLoading ? {} : common_vendor.e({
-    k: common_vendor.f($data.leaderboard, (item, index, i0) => {
+    l: common_vendor.f($data.leaderboard, (item, index, i0) => {
       return {
         a: common_vendor.t(index + 1),
         b: index < 3 ? 1 : "",
@@ -241,23 +391,23 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         f: item._openid
       };
     }),
-    l: $data.leaderboard.length === 0
+    m: $data.leaderboard.length === 0
   }, $data.leaderboard.length === 0 ? {} : {})) : {}, {
-    m: $data.activeTab === "today"
+    n: $data.activeTab === "today"
   }, $data.activeTab === "today" ? {} : {}, {
-    n: common_vendor.o(($event) => $options.switchTab("today")),
-    o: $data.activeTab === "period"
+    o: common_vendor.o(($event) => $options.switchTab("today")),
+    p: $data.activeTab === "period"
   }, $data.activeTab === "period" ? {} : {}, {
-    p: common_vendor.o(($event) => $options.switchTab("period")),
-    q: $data.showProfileModal
+    q: common_vendor.o(($event) => $options.switchTab("period")),
+    r: $data.showProfileModal
   }, $data.showProfileModal ? {
-    r: $data.tempAvatarUrl || "/static/default-avatar.png",
-    s: common_vendor.o((...args) => $options.onChooseAvatar && $options.onChooseAvatar(...args)),
-    t: $data.tempNickname,
-    v: common_vendor.o((...args) => $options.onNicknameBlur && $options.onNicknameBlur(...args)),
-    w: common_vendor.o((...args) => $options.onNicknameChange && $options.onNicknameChange(...args)),
-    x: common_vendor.o((...args) => $options.confirmProfile && $options.confirmProfile(...args)),
-    y: common_vendor.o((...args) => $options.cancelProfile && $options.cancelProfile(...args))
+    s: $data.tempAvatarUrl || "/static/default-avatar.png",
+    t: common_vendor.o((...args) => $options.onChooseAvatar && $options.onChooseAvatar(...args)),
+    v: $data.tempNickname,
+    w: common_vendor.o((...args) => $options.onNicknameBlur && $options.onNicknameBlur(...args)),
+    x: common_vendor.o((...args) => $options.onNicknameChange && $options.onNicknameChange(...args)),
+    y: common_vendor.o((...args) => $options.confirmProfile && $options.confirmProfile(...args)),
+    z: common_vendor.o((...args) => $options.cancelProfile && $options.cancelProfile(...args))
   } : {});
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render]]);

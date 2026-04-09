@@ -97,27 +97,58 @@ page {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24rpx 32rpx 16rpx;
+  padding: 16rpx 32rpx 8rpx;
 }
 .title-image {
-  width: 100%;
+  width: 85%; /* Reduced to give more space for map */
 }
 .countdown-badge {
-  margin-top: 16rpx;
+  margin-top: 10rpx;
   background-color: #f5d76e;
   border-radius: 100rpx;
-  padding: 10rpx 36rpx;
+  padding: 6rpx 24rpx;
 }
 .countdown-text {
-  font-size: 26rpx;
+  font-size: 22rpx; /* Reduced by ~5px equivalent to prevent overlap */
   color: #2d6040;
   font-weight: 600;
 }
 .tab1-content {
   flex: 1;
   display: flex;
+  position: relative;
+  width: 100%;
+}
+.route-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+.checkpoint {
+  position: absolute;
+  display: flex;
   align-items: center;
   justify-content: center;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.checkpoint-dot {
+  width: 12rpx; /* approx 5px-6px */
+  height: 12rpx;
+  background-color: #660000;
+  border-radius: 50%;
+}
+.checkpoint-star {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.cp-star {
+  font-size: 40rpx;
+  color: #660000; /* Dark red star */
 }
 
 /* ── Tab 2 ── */
