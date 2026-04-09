@@ -8,6 +8,7 @@ const _sfc_main = {
       totalStepsHistory: 0,
       stepTarget: 15e4,
       todayRank: "无",
+      userPosition: null,
       activeTab: "today",
       endDate: /* @__PURE__ */ new Date("2026-05-29T23:59:59"),
       leaderboard: [],
@@ -25,31 +26,31 @@ const _sfc_main = {
       mapHeight: 0,
       // Map check points (1 to 13 based on the Long March route)
       checkpoints: [
-        { x: 85, y: 80, label: "瑞金", pos: "right", style: "margin-left: 36rpx;" },
+        { x: 88, y: 79, label: "瑞金", pos: "right", style: "margin-left: 36rpx;" },
         // 1. Extra gap
-        { x: 65, y: 84, label: "血战湘江", pos: "bottom", style: "margin-top: 24rpx;" },
-        // 2. Extra gap from downward curve
-        { x: 50, y: 73, label: "遵义会议", pos: "right" },
-        // 3. 
-        { x: 36, y: 68, label: "四波赤水", pos: "top" },
-        // 4. 
-        { x: 25, y: 75, label: "巧渡金沙江", pos: "left" },
-        // 5. 
-        { x: 15, y: 65, label: "强渡大渡河", pos: "right" },
-        // 6. 
-        { x: 22, y: 56, label: "飞夺泸定桥", pos: "right" },
-        // 7. 
-        { x: 15, y: 48, label: "爬雪山", pos: "left" },
-        // 8. 
-        { x: 22, y: 40, label: "懋功会师", pos: "right" },
-        // 9. 
-        { x: 16, y: 32, label: "过草地", pos: "left" },
-        // 10. 
-        { x: 24, y: 24, label: "激战腊子口", pos: "right" },
-        // 11. 
-        { x: 35, y: 16, label: "大会师", pos: "top", style: "margin-bottom: 24rpx;" },
-        // 12. Extra gap from upward curve
-        { x: 55, y: 10 }
+        { x: 68, y: 84, label: "血战湘江", pos: "bottom", style: "" },
+        // 2.
+        { x: 53, y: 73, label: "遵义会议", pos: "right" },
+        // 3.
+        { x: 39, y: 68, label: "四波赤水", pos: "top" },
+        // 4.
+        { x: 28, y: 75, label: "巧渡金沙江", pos: "left" },
+        // 5.
+        { x: 18, y: 65, label: "强渡大渡河", pos: "left" },
+        // 6. shifted right for label spacing
+        { x: 25, y: 56, label: "飞夺泸定桥", pos: "right" },
+        // 7.
+        { x: 18, y: 48, label: "爬雪山", pos: "left" },
+        // 8.
+        { x: 25, y: 40, label: "懋功会师", pos: "left" },
+        // 9.
+        { x: 19, y: 32, label: "过草地", pos: "left" },
+        // 10.
+        { x: 27, y: 24, label: "激战腊子口", pos: "left" },
+        // 11.
+        { x: 38, y: 16, label: "大会师", pos: "right" },
+        // 12.
+        { x: 58, y: 10 }
         // 13. Yan'an
       ]
     };
@@ -85,6 +86,27 @@ const _sfc_main = {
         return 1;
       const stepsPerSegment = this.stepTarget / 12;
       return this.drawnSteps % stepsPerSegment / stepsPerSegment;
+    },
+    userMarkerTextPos() {
+      if (!this.userPosition)
+        return "top";
+      const ux = this.userPosition.x;
+      const uy = this.userPosition.y;
+      let nearest = null;
+      let minDist = Infinity;
+      for (const cp of this.checkpoints) {
+        if (!cp.label)
+          continue;
+        const dist = Math.sqrt(Math.pow(cp.x - ux, 2) + Math.pow(cp.y - uy, 2));
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = cp;
+        }
+      }
+      if (!nearest || minDist > 12)
+        return "top";
+      const opposite = { left: "right", right: "left", top: "bottom", bottom: "top", "bottom-left": "right" };
+      return opposite[nearest.pos] || "top";
     }
   },
   mounted() {
@@ -131,6 +153,8 @@ const _sfc_main = {
         this.drawMap();
         if (progress < 1) {
           setTimeout(step, 16);
+        } else {
+          this.computeUserPosition();
         }
       };
       step();
@@ -150,6 +174,50 @@ const _sfc_main = {
       this.drawPathSegments(ctx, points, width, height, true);
       ctx.draw();
     },
+    computeUserPosition() {
+      if (!this.mapWidth || !this.mapHeight || this.drawnSteps <= 0) {
+        this.userPosition = null;
+        return;
+      }
+      const W = this.mapWidth;
+      const H = this.mapHeight;
+      const points = this.checkpoints.map((cp) => ({
+        x: cp.x / 100 * W,
+        y: cp.y / 100 * H
+      }));
+      const segIdx = this.completedSegments;
+      const t = this.currentSegmentProgress;
+      if (segIdx >= points.length - 1) {
+        const last = points[points.length - 1];
+        this.userPosition = { x: last.x / W * 100, y: last.y / H * 100 };
+        return;
+      }
+      const p1 = points[segIdx];
+      const p2 = points[segIdx + 1];
+      let x, y;
+      if (segIdx === 0) {
+        const cx = (p1.x + p2.x) / 2, cy = Math.max(p1.y, p2.y) + 20;
+        x = Math.pow(1 - t, 2) * p1.x + 2 * (1 - t) * t * cx + t * t * p2.x;
+        y = Math.pow(1 - t, 2) * p1.y + 2 * (1 - t) * t * cy + t * t * p2.y;
+      } else if (segIdx === 1) {
+        const cx = (p1.x + p2.x) / 2, cy = Math.max(p1.y, p2.y) + 12;
+        x = Math.pow(1 - t, 2) * p1.x + 2 * (1 - t) * t * cx + t * t * p2.x;
+        y = Math.pow(1 - t, 2) * p1.y + 2 * (1 - t) * t * cy + t * t * p2.y;
+      } else if (segIdx === 3) {
+        const cx = (p1.x + p2.x) / 2 + 35, cy = Math.max(p1.y, p2.y) + 60;
+        x = Math.pow(1 - t, 2) * p1.x + 2 * (1 - t) * t * cx + t * t * p2.x;
+        y = Math.pow(1 - t, 2) * p1.y + 2 * (1 - t) * t * cy + t * t * p2.y;
+      } else if (segIdx === 11) {
+        const cx = p1.x, cy = p1.y - 35, cx2 = p2.x - 30, cy2 = p2.y;
+        const u = 1 - t;
+        x = u * u * u * p1.x + 3 * u * u * t * cx + 3 * u * t * t * cx2 + t * t * t * p2.x;
+        y = u * u * u * p1.y + 3 * u * u * t * cy + 3 * u * t * t * cy2 + t * t * t * p2.y;
+      } else {
+        x = p1.x + (p2.x - p1.x) * t;
+        y = p1.y + (p2.y - p1.y) * t;
+      }
+      this.userPosition = { x: x / W * 100, y: y / H * 100 };
+    },
     drawPathSegments(ctx, points, width, height, isActivePass) {
       for (let i = 0; i < points.length - 1; i++) {
         if (isActivePass && i > this.completedSegments)
@@ -158,11 +226,12 @@ const _sfc_main = {
         const p2 = points[i + 1];
         let isCurve = false;
         let isSingleZig = false;
-        let cx = 0, cy = 0;
+        let isCubic = false;
+        let cx = 0, cy = 0, cx2 = 0, cy2 = 0;
         if (i === 0) {
           isCurve = true;
           cx = (p1.x + p2.x) / 2;
-          cy = Math.max(p1.y, p2.y) + 40;
+          cy = Math.max(p1.y, p2.y) + 20;
         } else if (i === 1) {
           isCurve = true;
           cx = (p1.x + p2.x) / 2;
@@ -172,14 +241,24 @@ const _sfc_main = {
           cx = (p1.x + p2.x) / 2 + 35;
           cy = Math.max(p1.y, p2.y) + 60;
         } else if (i === 11) {
-          isSingleZig = true;
-          cx = (p1.x + p2.x) / 2 - 5;
-          cy = Math.min(p1.y, p2.y) - 25;
+          isCubic = true;
+          cx = p1.x;
+          cy = p1.y - 35;
+          cx2 = p2.x - 30;
+          cy2 = p2.y;
         }
         const startRadius = i === 0 ? 14 : 8;
         const endRadius = i + 1 === points.length - 1 ? 18 : 10;
         let startX, startY, endX, endY, endAngle;
-        if (isCurve || isSingleZig) {
+        if (isCubic) {
+          const angStart = Math.atan2(cy - p1.y, cx - p1.x);
+          startX = p1.x + startRadius * Math.cos(angStart);
+          startY = p1.y + startRadius * Math.sin(angStart);
+          const angEnd = Math.atan2(p2.y - cy2, p2.x - cx2);
+          endX = p2.x - endRadius * Math.cos(angEnd);
+          endY = p2.y - endRadius * Math.sin(angEnd);
+          endAngle = angEnd;
+        } else if (isCurve || isSingleZig) {
           const angStart = Math.atan2(cy - p1.y, cx - p1.x);
           startX = p1.x + startRadius * Math.cos(angStart);
           startY = p1.y + startRadius * Math.sin(angStart);
@@ -206,11 +285,10 @@ const _sfc_main = {
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         if (progress >= 1) {
-          if (isCurve) {
+          if (isCubic) {
+            ctx.bezierCurveTo(cx, cy, cx2, cy2, lineEndX, lineEndY);
+          } else if (isCurve) {
             ctx.quadraticCurveTo(cx, cy, lineEndX, lineEndY);
-          } else if (isSingleZig) {
-            ctx.lineTo(cx, cy);
-            ctx.lineTo(lineEndX, lineEndY);
           } else {
             ctx.lineTo(lineEndX, lineEndY);
           }
@@ -220,19 +298,13 @@ const _sfc_main = {
           for (let step = 1; step <= maxStep; step++) {
             const t = Math.min(step / curveRes, progress);
             let currentX, currentY;
-            if (isCurve) {
+            if (isCubic) {
+              const u = 1 - t;
+              currentX = u * u * u * startX + 3 * u * u * t * cx + 3 * u * t * t * cx2 + t * t * t * lineEndX;
+              currentY = u * u * u * startY + 3 * u * u * t * cy + 3 * u * t * t * cy2 + t * t * t * lineEndY;
+            } else if (isCurve) {
               currentX = Math.pow(1 - t, 2) * startX + 2 * (1 - t) * t * cx + Math.pow(t, 2) * lineEndX;
               currentY = Math.pow(1 - t, 2) * startY + 2 * (1 - t) * t * cy + Math.pow(t, 2) * lineEndY;
-            } else if (isSingleZig) {
-              if (t < 0.5) {
-                const nt = t * 2;
-                currentX = startX + (cx - startX) * nt;
-                currentY = startY + (cy - startY) * nt;
-              } else {
-                const nt = (t - 0.5) * 2;
-                currentX = cx + (lineEndX - cx) * nt;
-                currentY = cy + (lineEndY - cy) * nt;
-              }
             } else {
               currentX = startX + (lineEndX - startX) * t;
               currentY = startY + (lineEndY - startY) * t;
@@ -244,34 +316,20 @@ const _sfc_main = {
         ctx.setLineWidth(5);
         ctx.stroke();
         if (!isActivePass || isFullyActive) {
-          if (i === 11) {
-            if (isActivePass || !this.isActivePass) {
-              const shouldDrawIcon = isActivePass && isFullyActive || !isActivePass && !isFullyActive;
-              if (shouldDrawIcon) {
-                const imgSize = 24;
-                if (!isActivePass)
-                  ctx.setGlobalAlpha(0.3);
-                ctx.drawImage("/static/checkpoint.png", endX - imgSize / 2, endY - imgSize / 2, imgSize, imgSize);
-                if (!isActivePass)
-                  ctx.setGlobalAlpha(1);
-              }
-            }
-          } else {
-            const arrowLength = 14;
-            ctx.beginPath();
-            ctx.moveTo(endX, endY);
-            ctx.lineTo(
-              endX - arrowLength * Math.cos(endAngle - Math.PI / 6),
-              endY - arrowLength * Math.sin(endAngle - Math.PI / 6)
-            );
-            ctx.lineTo(
-              endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
-              endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
-            );
-            ctx.closePath();
-            ctx.fillStyle = isActivePass ? "#f5d76e" : "rgba(255, 255, 255, 0.2)";
-            ctx.fill();
-          }
+          const arrowLength = 14;
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(
+            endX - arrowLength * Math.cos(endAngle - Math.PI / 6),
+            endY - arrowLength * Math.sin(endAngle - Math.PI / 6)
+          );
+          ctx.lineTo(
+            endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
+            endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
+          );
+          ctx.closePath();
+          ctx.fillStyle = isActivePass ? "#f5d76e" : "rgba(255, 255, 255, 0.2)";
+          ctx.fill();
         }
       }
     },
@@ -312,7 +370,7 @@ const _sfc_main = {
           this.leaderboardLoading = false;
         },
         fail: (err) => {
-          common_vendor.index.__f__("error", "at pages/index/index.vue:475", "Leaderboard fetch failed:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:585", "Leaderboard fetch failed:", err);
           this.leaderboardLoading = false;
         }
       });
@@ -375,7 +433,7 @@ const _sfc_main = {
             fail(err) {
               common_vendor.index.hideLoading();
               common_vendor.index.showToast({ title: "读取数据失败", icon: "none" });
-              common_vendor.index.__f__("error", "at pages/index/index.vue:542", err);
+              common_vendor.index.__f__("error", "at pages/index/index.vue:652", err);
             }
           });
         },
@@ -399,7 +457,7 @@ const _sfc_main = {
             that._uploadLocalFileAndSync(dlRes.tempFilePath, nickname);
           },
           fail: (err) => {
-            common_vendor.index.__f__("error", "at pages/index/index.vue:568", "Avatar download failed:", err);
+            common_vendor.index.__f__("error", "at pages/index/index.vue:678", "Avatar download failed:", err);
             common_vendor.index.hideLoading();
             that.doSync(nickname, "");
           }
@@ -424,7 +482,7 @@ const _sfc_main = {
           that.doSync(nickname, cloudUrl);
         },
         fail: (err) => {
-          common_vendor.index.__f__("error", "at pages/index/index.vue:593", "Avatar upload failed:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:703", "Avatar upload failed:", err);
           common_vendor.index.hideLoading();
           that.doSync(nickname, "");
         }
@@ -444,6 +502,8 @@ const _sfc_main = {
           if (res.result && res.result.success) {
             const oldSteps = that.todaysSteps;
             that.todaysSteps = res.result.todaySteps;
+            if (res.result.rank)
+              that.todayRank = res.result.rank;
             that.saveData();
             common_vendor.index.showToast({ title: "步数已更新！", icon: "success" });
             if (that.activeTab === "today") {
@@ -451,13 +511,13 @@ const _sfc_main = {
             }
           } else {
             common_vendor.index.showToast({ title: res.result.msg || "出错了，请重试", icon: "none" });
-            common_vendor.index.__f__("error", "at pages/index/index.vue:622", "syncSteps failed:", res.result);
+            common_vendor.index.__f__("error", "at pages/index/index.vue:733", "syncSteps failed:", res.result);
           }
         },
         fail: (err) => {
           common_vendor.index.hideLoading();
           common_vendor.index.showToast({ title: "同步失败，请重试", icon: "none" });
-          common_vendor.index.__f__("error", "at pages/index/index.vue:628", "callFunction fail:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:739", "callFunction fail:", err);
         }
       });
     }
@@ -482,10 +542,11 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
       return common_vendor.e({
         a: index === 0 || index === $data.checkpoints.length - 1
       }, index === 0 || index === $data.checkpoints.length - 1 ? {} : {}, {
-        b: index,
-        c: common_vendor.n(index === 0 || index === $data.checkpoints.length - 1 ? "checkpoint-star" : "checkpoint-dot"),
-        d: common_vendor.n(index < $options.currentCheckpointIndex ? "checkpoint-active" : "checkpoint-inactive"),
-        e: common_vendor.n(index < $options.currentCheckpointIndex && $data.drawnSteps > 0 || index === 0 && $data.drawnSteps === 0 ? "checkpoint-blinking" : ""),
+        b: index > 0 && index < $options.currentCheckpointIndex
+      }, index > 0 && index < $options.currentCheckpointIndex ? {} : {}, {
+        c: index,
+        d: common_vendor.n(index === 0 || index === $data.checkpoints.length - 1 ? "checkpoint-star" : "checkpoint-dot"),
+        e: common_vendor.n(index < $options.currentCheckpointIndex ? "checkpoint-active" : "checkpoint-inactive"),
         f: cp.x + "%",
         g: cp.y + "%"
       });
@@ -508,12 +569,20 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         h: cp.y + "%"
       });
     })
+  } : {}, {
+    n: $data.userPosition && !$data.showProfileModal && $data.drawnSteps > 0
+  }, $data.userPosition && !$data.showProfileModal && $data.drawnSteps > 0 ? {
+    o: common_assets._imports_2,
+    p: common_vendor.t($data.todaysSteps.toLocaleString()),
+    q: common_vendor.n("user-steps-" + $options.userMarkerTextPos),
+    r: $data.userPosition.x + "%",
+    s: $data.userPosition.y + "%"
   } : {}) : {}, {
-    n: $data.activeTab === "period"
+    t: $data.activeTab === "period"
   }, $data.activeTab === "period" ? common_vendor.e({
-    o: $data.leaderboardLoading
+    v: $data.leaderboardLoading
   }, $data.leaderboardLoading ? {} : common_vendor.e({
-    p: common_vendor.f($data.leaderboard, (item, index, i0) => {
+    w: common_vendor.f($data.leaderboard, (item, index, i0) => {
       return {
         a: common_vendor.t(index + 1),
         b: index < 3 ? 1 : "",
@@ -523,23 +592,23 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         f: item._openid
       };
     }),
-    q: $data.leaderboard.length === 0
+    x: $data.leaderboard.length === 0
   }, $data.leaderboard.length === 0 ? {} : {})) : {}, {
-    r: $data.activeTab === "today"
+    y: $data.activeTab === "today"
   }, $data.activeTab === "today" ? {} : {}, {
-    s: common_vendor.o(($event) => $options.switchTab("today")),
-    t: $data.activeTab === "period"
+    z: common_vendor.o(($event) => $options.switchTab("today")),
+    A: $data.activeTab === "period"
   }, $data.activeTab === "period" ? {} : {}, {
-    v: common_vendor.o(($event) => $options.switchTab("period")),
-    w: $data.showProfileModal
+    B: common_vendor.o(($event) => $options.switchTab("period")),
+    C: $data.showProfileModal
   }, $data.showProfileModal ? {
-    x: $data.tempAvatarUrl || "/static/default-avatar.png",
-    y: common_vendor.o((...args) => $options.onChooseAvatar && $options.onChooseAvatar(...args)),
-    z: $data.tempNickname,
-    A: common_vendor.o((...args) => $options.onNicknameBlur && $options.onNicknameBlur(...args)),
-    B: common_vendor.o((...args) => $options.onNicknameChange && $options.onNicknameChange(...args)),
-    C: common_vendor.o((...args) => $options.confirmProfile && $options.confirmProfile(...args)),
-    D: common_vendor.o((...args) => $options.cancelProfile && $options.cancelProfile(...args))
+    D: $data.tempAvatarUrl || "/static/default-avatar.png",
+    E: common_vendor.o((...args) => $options.onChooseAvatar && $options.onChooseAvatar(...args)),
+    F: $data.tempNickname,
+    G: common_vendor.o((...args) => $options.onNicknameBlur && $options.onNicknameBlur(...args)),
+    H: common_vendor.o((...args) => $options.onNicknameChange && $options.onNicknameChange(...args)),
+    I: common_vendor.o((...args) => $options.confirmProfile && $options.confirmProfile(...args)),
+    J: common_vendor.o((...args) => $options.cancelProfile && $options.cancelProfile(...args))
   } : {});
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render]]);

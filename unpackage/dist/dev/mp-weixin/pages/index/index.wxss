@@ -29,7 +29,7 @@ page {
 
 /* ── Top Nav ── */
 .top-nav {
-  background-color: rgba(30, 70, 45, 0.85);
+  background-color: #2c7c41;
   padding: 20rpx 32rpx;
   flex-shrink: 0;
   display: flex;
@@ -57,7 +57,7 @@ page {
 }
 .nav-yellow {
   font-size: 26rpx;
-  color: #f5d76e;
+  color: #ffffff;
   font-weight: 500;
 }
 .nav-gap {
@@ -65,15 +65,15 @@ page {
 }
 .nav-hint {
   font-size: 24rpx;
-  color: #f5d76e;
+  color: #ffffff;
 }
 .sync-btn {
   background-color: #ffffff;
-  color: #2d6040;
+  color: #76c9ad;
   font-size: 24rpx;
   font-weight: 600;
   border-radius: 40rpx;
-  border: 2rpx solid #4a9e6a;
+  border: 2rpx solid #76c9ad;
   padding: 0 28rpx;
   height: 78rpx;
   line-height: 78rpx;
@@ -104,9 +104,12 @@ page {
 }
 .countdown-badge {
   margin-top: 10rpx;
-  background-color: #f5d76e;
+  background-color: #f6d18a;
   border-radius: 100rpx;
   padding: 6rpx 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .countdown-text {
   font-size: 22rpx; /* Reduced by ~5px equivalent to prevent overlap */
@@ -208,10 +211,14 @@ page {
   left: 50%;
   transform: translateX(-50%);
 }
+.label-bottom-left {
+  top: 100%;
+  right: 0;
+}
 .final-text {
   position: absolute;
   left: 100%;
-  margin-left: 18rpx;
+  margin-left: 36rpx;
   top: 50%;
   transform: translateY(-50%);
   color: #ffffff;
@@ -221,17 +228,49 @@ page {
   text-shadow: 0 2rpx 6rpx rgba(0,0,0,0.6);
 }
 
-/* Blinking Animation for active points */
-@keyframes softPulse {
-0% { transform: translate(-50%, -50%) scale(1); opacity: 1;
+/* Sonar pulse ring for crossed checkpoint dots */
+@keyframes sonarPulse {
+0%   { transform: scale(1);   opacity: 0.8;
 }
-50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7;
-}
-100% { transform: translate(-50%, -50%) scale(1); opacity: 1;
+100% { transform: scale(3.5); opacity: 0;
 }
 }
-.checkpoint-blinking {
-  animation: softPulse 1.5s infinite ease-in-out;
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: #660000;
+  animation: sonarPulse 1.5s infinite ease-out;
+  pointer-events: none;
+}
+.user-marker {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.user-marker-img {
+  width: 36rpx;
+  height: 36rpx;
+}
+.user-marker-steps {
+  position: absolute;
+  white-space: nowrap;
+  color: #ffffff;
+  font-size: 18rpx;
+  font-weight: 700;
+  text-shadow: 0 1rpx 4rpx rgba(0,0,0,0.9);
+}
+.user-steps-top    { bottom: 100%; margin-bottom: 6rpx; left: 50%; transform: translateX(-50%);
+}
+.user-steps-bottom { top: 100%;    margin-top: 6rpx;    left: 50%; transform: translateX(-50%);
+}
+.user-steps-left   { right: 100%; margin-right: 8rpx; top: 50%; transform: translateY(-50%);
+}
+.user-steps-right  { left: 100%;  margin-left: 8rpx;  top: 50%; transform: translateY(-50%);
 }
 
 /* ── Tab 2 ── */
@@ -304,7 +343,7 @@ page {
 
 /* ── Bottom Nav ── */
 .bottom-nav {
-  background-color: rgba(30, 70, 45, 0.85);
+  background-color: #2c7c41;
   display: flex;
   flex-direction: row;
   align-items: center;

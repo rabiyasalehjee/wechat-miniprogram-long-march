@@ -66,7 +66,9 @@ exports.main = async (event, context) => {
 
   // ── Decrypt WeRun data directly in cloud function ──
   if (event.action === 'syncSteps') {
-    const { code, encryptedData, iv, nickname, avatarUrl } = event
+    const { code, encryptedData, iv, nickname } = event
+    // Only accept cloud:// URLs — wxfile:// paths are device-local temp files
+    const avatarUrl = (event.avatarUrl || '').startsWith('cloud://') ? event.avatarUrl : ''
 
     try {
       // 1. Exchange code for session_key
@@ -95,19 +97,30 @@ exports.main = async (event, context) => {
         avatarUrl: avatarUrl || '',
       }
 
+      let totalSteps
       if (userRecord.data.length > 0) {
         const docId = userRecord.data[0]._id
         const prevTotal = userRecord.data[0].totalSteps || 0
+        totalSteps = prevTotal + todaySteps
         await db.collection('userSteps').doc(docId).update({
-          data: { ...updateData, totalSteps: prevTotal + todaySteps }
+          data: { ...updateData, totalSteps }
         })
-        return { success: true, todaySteps, totalSteps: prevTotal + todaySteps }
       } else {
+        totalSteps = todaySteps
         await db.collection('userSteps').add({
-          data: { _openid: openid, totalSteps: todaySteps, ...updateData, createdAt: db.serverDate() }
+          data: { _openid: openid, totalSteps, ...updateData, createdAt: db.serverDate() }
         })
-        return { success: true, todaySteps, totalSteps: todaySteps }
       }
+
+      // Calculate today's rank: count users with more steps today
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const rankRes = await db.collection('userSteps')
+        .where({ lastUpdate: _.gte(today), todaySteps: _.gt(todaySteps) })
+        .count()
+      const rank = rankRes.total + 1
+
+      return { success: true, todaySteps, totalSteps, rank }
     } catch (err) {
       console.error('syncSteps error:', err)
       return { success: false, error: err.message }

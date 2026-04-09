@@ -41,12 +41,12 @@
           class="checkpoint"
           :class="[
             (index === 0 || index === checkpoints.length - 1) ? 'checkpoint-star' : 'checkpoint-dot',
-            index < currentCheckpointIndex ? 'checkpoint-active' : 'checkpoint-inactive',
-            (index < currentCheckpointIndex && drawnSteps > 0) || (index === 0 && drawnSteps === 0) ? 'checkpoint-blinking' : ''
+            index < currentCheckpointIndex ? 'checkpoint-active' : 'checkpoint-inactive'
           ]"
           :style="{ left: cp.x + '%', top: cp.y + '%' }"
         >
           <text class="cp-star" v-if="index === 0 || index === checkpoints.length - 1">★</text>
+          <view v-if="index > 0 && index < currentCheckpointIndex" class="pulse-ring"></view>
         </view>
         
         <!-- Checkpoint Labels (Rendered outside the blinking view to prevent blinking) -->
@@ -59,6 +59,16 @@
         >
           <text v-if="index === checkpoints.length - 1" class="final-text">终点150000步</text>
           <text v-if="cp.label" class="cp-label" :class="'label-' + cp.pos" :style="cp.style">{{ cp.label }}</text>
+        </view>
+
+        <!-- User progress marker: ONE checkpoint icon at the tip of the yellow line -->
+        <view
+          v-if="userPosition && !showProfileModal && drawnSteps > 0"
+          class="user-marker"
+          :style="{ left: userPosition.x + '%', top: userPosition.y + '%' }"
+        >
+          <image src="/static/checkpoint.png" class="user-marker-img" mode="aspectFit" />
+          <text class="user-marker-steps" :class="'user-steps-' + userMarkerTextPos">{{ todaysSteps.toLocaleString() }}</text>
         </view>
       </view>
     </view>
@@ -146,6 +156,7 @@ export default {
       totalStepsHistory: 0,
       stepTarget: 150000,
       todayRank: '无',
+      userPosition: null,
       activeTab: 'today',
       endDate: new Date('2026-05-29T23:59:59'),
       leaderboard: [],
@@ -163,19 +174,19 @@ export default {
       mapHeight: 0,
       // Map check points (1 to 13 based on the Long March route)
       checkpoints: [
-        { x: 85, y: 80, label: '瑞金', pos: 'right', style: 'margin-left: 36rpx;' }, // 1. Extra gap
-        { x: 65, y: 84, label: '血战湘江', pos: 'bottom', style: 'margin-top: 24rpx;' }, // 2. Extra gap from downward curve
-        { x: 50, y: 73, label: '遵义会议', pos: 'right' }, // 3. 
-        { x: 36, y: 68, label: '四波赤水', pos: 'top' }, // 4. 
-        { x: 25, y: 75, label: '巧渡金沙江', pos: 'left' }, // 5. 
-        { x: 15, y: 65, label: '强渡大渡河', pos: 'right' }, // 6. 
-        { x: 22, y: 56, label: '飞夺泸定桥', pos: 'right' }, // 7. 
-        { x: 15, y: 48, label: '爬雪山', pos: 'left' }, // 8. 
-        { x: 22, y: 40, label: '懋功会师', pos: 'right' }, // 9. 
-        { x: 16, y: 32, label: '过草地', pos: 'left' }, // 10. 
-        { x: 24, y: 24, label: '激战腊子口', pos: 'right' }, // 11. 
-        { x: 35, y: 16, label: '大会师', pos: 'top', style: 'margin-bottom: 24rpx;' }, // 12. Extra gap from upward curve
-        { x: 55, y: 10 }  // 13. Yan'an
+        { x: 88, y: 79, label: '瑞金', pos: 'right', style: 'margin-left: 36rpx;' }, // 1. Extra gap
+        { x: 68, y: 84, label: '血战湘江', pos: 'bottom', style: '' }, // 2.
+        { x: 53, y: 73, label: '遵义会议', pos: 'right' }, // 3.
+        { x: 39, y: 68, label: '四波赤水', pos: 'top' }, // 4.
+        { x: 28, y: 75, label: '巧渡金沙江', pos: 'left' }, // 5.
+        { x: 18, y: 65, label: '强渡大渡河', pos: 'left' }, // 6. shifted right for label spacing
+        { x: 25, y: 56, label: '飞夺泸定桥', pos: 'right' }, // 7.
+        { x: 18, y: 48, label: '爬雪山', pos: 'left' }, // 8.
+        { x: 25, y: 40, label: '懋功会师', pos: 'left' }, // 9.
+        { x: 19, y: 32, label: '过草地', pos: 'left' }, // 10.
+        { x: 27, y: 24, label: '激战腊子口', pos: 'left' }, // 11.
+        { x: 38, y: 16, label: '大会师', pos: 'right' }, // 12.
+        { x: 58, y: 10 }  // 13. Yan'an
       ]
     }
   },
@@ -207,6 +218,21 @@ export default {
       if (this.drawnSteps >= this.stepTarget) return 1;
       const stepsPerSegment = this.stepTarget / 12;
       return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
+    },
+    userMarkerTextPos() {
+      if (!this.userPosition) return 'top';
+      const ux = this.userPosition.x;
+      const uy = this.userPosition.y;
+      let nearest = null;
+      let minDist = Infinity;
+      for (const cp of this.checkpoints) {
+        if (!cp.label) continue;
+        const dist = Math.sqrt(Math.pow(cp.x - ux, 2) + Math.pow(cp.y - uy, 2));
+        if (dist < minDist) { minDist = dist; nearest = cp; }
+      }
+      if (!nearest || minDist > 12) return 'top';
+      const opposite = { left: 'right', right: 'left', top: 'bottom', bottom: 'top', 'bottom-left': 'right' };
+      return opposite[nearest.pos] || 'top';
     }
   },
   mounted() {
@@ -255,9 +281,12 @@ export default {
         
         this.drawnSteps = Math.floor(startValue + (endValue - startValue) * easeProgress);
         this.drawMap();
-        
+
         if (progress < 1) {
           setTimeout(step, 16); // ~60fps
+        } else {
+          // Animation done — place the checkpoint marker at the final position
+          this.computeUserPosition();
         }
       };
       step();
@@ -283,6 +312,55 @@ export default {
       
       ctx.draw();
     },
+    computeUserPosition() {
+      if (!this.mapWidth || !this.mapHeight || this.drawnSteps <= 0) {
+        this.userPosition = null;
+        return;
+      }
+      const W = this.mapWidth;
+      const H = this.mapHeight;
+      const points = this.checkpoints.map(cp => ({
+        x: (cp.x / 100) * W,
+        y: (cp.y / 100) * H
+      }));
+
+      const segIdx = this.completedSegments;
+      const t = this.currentSegmentProgress;
+
+      if (segIdx >= points.length - 1) {
+        const last = points[points.length - 1];
+        this.userPosition = { x: (last.x / W) * 100, y: (last.y / H) * 100 };
+        return;
+      }
+
+      const p1 = points[segIdx];
+      const p2 = points[segIdx + 1];
+      let x, y;
+
+      if (segIdx === 0) {
+        const cx = (p1.x + p2.x) / 2, cy = Math.max(p1.y, p2.y) + 20;
+        x = Math.pow(1-t,2)*p1.x + 2*(1-t)*t*cx + t*t*p2.x;
+        y = Math.pow(1-t,2)*p1.y + 2*(1-t)*t*cy + t*t*p2.y;
+      } else if (segIdx === 1) {
+        const cx = (p1.x + p2.x) / 2, cy = Math.max(p1.y, p2.y) + 12;
+        x = Math.pow(1-t,2)*p1.x + 2*(1-t)*t*cx + t*t*p2.x;
+        y = Math.pow(1-t,2)*p1.y + 2*(1-t)*t*cy + t*t*p2.y;
+      } else if (segIdx === 3) {
+        const cx = (p1.x + p2.x) / 2 + 35, cy = Math.max(p1.y, p2.y) + 60;
+        x = Math.pow(1-t,2)*p1.x + 2*(1-t)*t*cx + t*t*p2.x;
+        y = Math.pow(1-t,2)*p1.y + 2*(1-t)*t*cy + t*t*p2.y;
+      } else if (segIdx === 11) {
+        const cx = p1.x, cy = p1.y - 35, cx2 = p2.x - 30, cy2 = p2.y;
+        const u = 1 - t;
+        x = u*u*u*p1.x + 3*u*u*t*cx + 3*u*t*t*cx2 + t*t*t*p2.x;
+        y = u*u*u*p1.y + 3*u*u*t*cy + 3*u*t*t*cy2 + t*t*t*p2.y;
+      } else {
+        x = p1.x + (p2.x - p1.x) * t;
+        y = p1.y + (p2.y - p1.y) * t;
+      }
+
+      this.userPosition = { x: (x / W) * 100, y: (y / H) * 100 };
+    },
     drawPathSegments(ctx, points, width, height, isActivePass) {
       for (let i = 0; i < points.length - 1; i++) {
         // If we are doing the active pass and haven't reached this segment at all, skip
@@ -295,12 +373,13 @@ export default {
 
         let isCurve = false;
         let isSingleZig = false;
-        let cx = 0, cy = 0;
+        let isCubic = false;
+        let cx = 0, cy = 0, cx2 = 0, cy2 = 0;
 
         if (i === 0) {
           isCurve = true;
           cx = (p1.x + p2.x) / 2;
-          cy = Math.max(p1.y, p2.y) + 40;
+          cy = Math.max(p1.y, p2.y) + 20;
         } else if (i === 1) {
           isCurve = true;
           cx = (p1.x + p2.x) / 2;
@@ -310,9 +389,9 @@ export default {
           cx = (p1.x + p2.x) / 2 + 35; 
           cy = Math.max(p1.y, p2.y) + 60; 
         } else if (i === 11) {
-          isSingleZig = true;
-          cx = (p1.x + p2.x) / 2 - 5; 
-          cy = Math.min(p1.y, p2.y) - 25; 
+          isCubic = true;
+          cx  = p1.x;       cy  = p1.y - 35;  // go straight up from start
+          cx2 = p2.x - 30;  cy2 = p2.y;       // approach destination from the left
         }
 
         const startRadius = (i === 0) ? 14 : 8; 
@@ -320,11 +399,19 @@ export default {
         
         let startX, startY, endX, endY, endAngle;
 
-        if (isCurve || isSingleZig) {
+        if (isCubic) {
           const angStart = Math.atan2(cy - p1.y, cx - p1.x);
           startX = p1.x + startRadius * Math.cos(angStart);
           startY = p1.y + startRadius * Math.sin(angStart);
-          
+          const angEnd = Math.atan2(p2.y - cy2, p2.x - cx2);
+          endX = p2.x - endRadius * Math.cos(angEnd);
+          endY = p2.y - endRadius * Math.sin(angEnd);
+          endAngle = angEnd;
+        } else if (isCurve || isSingleZig) {
+          const angStart = Math.atan2(cy - p1.y, cx - p1.x);
+          startX = p1.x + startRadius * Math.cos(angStart);
+          startY = p1.y + startRadius * Math.sin(angStart);
+
           const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
           endX = p2.x - endRadius * Math.cos(angEnd);
           endY = p2.y - endRadius * Math.sin(angEnd);
@@ -357,10 +444,23 @@ export default {
 
         if (progress >= 1.0) {
           // Draw full segment
-          if (isCurve) {
+          if (isCubic) {
+            ctx.bezierCurveTo(cx, cy, cx2, cy2, lineEndX, lineEndY);
+          } else if (isCurve) {
             ctx.quadraticCurveTo(cx, cy, lineEndX, lineEndY);
           } else if (isSingleZig) {
-            ctx.lineTo(cx, cy); 
+            // Rounded corner: stop short of the corner, arc through it, continue to end
+            const d1x = cx - startX, d1y = cy - startY;
+            const len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+            const d2x = lineEndX - cx, d2y = lineEndY - cy;
+            const len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+            const rr = Math.min(18, len1 * 0.35, len2 * 0.35);
+            const bx = cx - (d1x / len1) * rr; // point just before corner
+            const by = cy - (d1y / len1) * rr;
+            const ax = cx + (d2x / len2) * rr; // point just after corner
+            const ay = cy + (d2y / len2) * rr;
+            ctx.lineTo(bx, by);
+            ctx.quadraticCurveTo(cx, cy, ax, ay);
             ctx.lineTo(lineEndX, lineEndY);
           } else {
             ctx.lineTo(lineEndX, lineEndY);
@@ -375,18 +475,42 @@ export default {
             const t = Math.min(step / curveRes, progress);
             let currentX, currentY;
             
-            if (isCurve) {
+            if (isCubic) {
+              const u = 1 - t;
+              currentX = u*u*u*startX + 3*u*u*t*cx + 3*u*t*t*cx2 + t*t*t*lineEndX;
+              currentY = u*u*u*startY + 3*u*u*t*cy + 3*u*t*t*cy2 + t*t*t*lineEndY;
+            } else if (isCurve) {
               currentX = Math.pow(1 - t, 2) * startX + 2 * (1 - t) * t * cx + Math.pow(t, 2) * lineEndX;
               currentY = Math.pow(1 - t, 2) * startY + 2 * (1 - t) * t * cy + Math.pow(t, 2) * lineEndY;
             } else if (isSingleZig) {
-              if (t < 0.5) {
-                const nt = t * 2;
-                currentX = startX + (cx - startX) * nt;
-                currentY = startY + (cy - startY) * nt;
+              // Match the rounded corner path for smooth partial animation
+              const d1x = cx - startX, d1y = cy - startY;
+              const len1 = Math.sqrt(d1x * d1x + d1y * d1y);
+              const d2x = lineEndX - cx, d2y = lineEndY - cy;
+              const len2 = Math.sqrt(d2x * d2x + d2y * d2y);
+              const rr = Math.min(18, len1 * 0.35, len2 * 0.35);
+              const bx = cx - (d1x / len1) * rr;
+              const by = cy - (d1y / len1) * rr;
+              const ax = cx + (d2x / len2) * rr;
+              const ay = cy + (d2y / len2) * rr;
+              // Total path has 3 sections: leg1 (start→b), arc (b→a via cx,cy), leg2 (a→end)
+              const leg1 = len1 - rr;
+              const arcLen = rr * Math.PI * 0.5; // approximate arc length
+              const leg2 = len2 - rr;
+              const total = leg1 + arcLen + leg2;
+              const dist = t * total;
+              if (dist <= leg1) {
+                const nt = dist / leg1;
+                currentX = startX + (bx - startX) * nt;
+                currentY = startY + (by - startY) * nt;
+              } else if (dist <= leg1 + arcLen) {
+                const nt = (dist - leg1) / arcLen;
+                currentX = Math.pow(1 - nt, 2) * bx + 2 * (1 - nt) * nt * cx + Math.pow(nt, 2) * ax;
+                currentY = Math.pow(1 - nt, 2) * by + 2 * (1 - nt) * nt * cy + Math.pow(nt, 2) * ay;
               } else {
-                const nt = (t - 0.5) * 2;
-                currentX = cx + (lineEndX - cx) * nt;
-                currentY = cy + (lineEndY - cy) * nt;
+                const nt = (dist - leg1 - arcLen) / leg2;
+                currentX = ax + (lineEndX - ax) * nt;
+                currentY = ay + (lineEndY - ay) * nt;
               }
             } else {
               currentX = startX + (lineEndX - startX) * t;
@@ -402,34 +526,20 @@ export default {
 
         // Only draw arrowheads if the segment is fully active (or for the inactive background)
         if (!isActivePass || isFullyActive) {
-          if (i === 11) {
-            if (isActivePass || !this.isActivePass) {
-               // Only draw icon once, on the active pass if active, or inactive pass if not reached
-               const shouldDrawIcon = (isActivePass && isFullyActive) || (!isActivePass && !isFullyActive);
-               if (shouldDrawIcon) {
-                 const imgSize = 24;
-                 // Set global alpha for greyed out image if inactive
-                 if (!isActivePass) ctx.setGlobalAlpha(0.3);
-                 ctx.drawImage('/static/checkpoint.png', endX - imgSize/2, endY - imgSize/2, imgSize, imgSize);
-                 if (!isActivePass) ctx.setGlobalAlpha(1.0);
-               }
-            }
-          } else {
-            const arrowLength = 14;
-            ctx.beginPath();
-            ctx.moveTo(endX, endY);
-            ctx.lineTo(
-              endX - arrowLength * Math.cos(endAngle - Math.PI / 6),
-              endY - arrowLength * Math.sin(endAngle - Math.PI / 6)
-            );
-            ctx.lineTo(
-              endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
-              endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
-            );
-            ctx.closePath();
-            ctx.fillStyle = isActivePass ? '#f5d76e' : 'rgba(255, 255, 255, 0.2)';
-            ctx.fill();
-          }
+          const arrowLength = 14;
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(
+            endX - arrowLength * Math.cos(endAngle - Math.PI / 6),
+            endY - arrowLength * Math.sin(endAngle - Math.PI / 6)
+          );
+          ctx.lineTo(
+            endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
+            endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
+          );
+          ctx.closePath();
+          ctx.fillStyle = isActivePass ? '#f5d76e' : 'rgba(255, 255, 255, 0.2)';
+          ctx.fill();
         }
       }
     },
@@ -610,9 +720,10 @@ export default {
           if (res.result && res.result.success) {
             const oldSteps = that.todaysSteps;
             that.todaysSteps = res.result.todaySteps;
+            if (res.result.rank) that.todayRank = res.result.rank;
             that.saveData();
             uni.showToast({ title: '步数已更新！', icon: 'success' });
-            
+
             // Animate growth from old to new steps
             if (that.activeTab === 'today') {
               that.initMapAndAnimate(oldSteps, that.todaysSteps);
@@ -667,7 +778,7 @@ page {
 
 /* ── Top Nav ── */
 .top-nav {
-  background-color: rgba(30, 70, 45, 0.85);
+  background-color: #2c7c41;
   padding: 20rpx 32rpx;
   flex-shrink: 0;
   display: flex;
@@ -699,7 +810,7 @@ page {
 
 .nav-yellow {
   font-size: 26rpx;
-  color: #f5d76e;
+  color: #ffffff;
   font-weight: 500;
 }
 
@@ -709,16 +820,16 @@ page {
 
 .nav-hint {
   font-size: 24rpx;
-  color: #f5d76e;
+  color: #ffffff;
 }
 
 .sync-btn {
   background-color: #ffffff;
-  color: #2d6040;
+  color: #76c9ad;
   font-size: 24rpx;
   font-weight: 600;
   border-radius: 40rpx;
-  border: 2rpx solid #4a9e6a;
+  border: 2rpx solid #76c9ad;
   padding: 0 28rpx;
   height: 78rpx;
   line-height: 78rpx;
@@ -752,9 +863,12 @@ page {
 
 .countdown-badge {
   margin-top: 10rpx;
-  background-color: #f5d76e;
+  background-color: #f6d18a;
   border-radius: 100rpx;
   padding: 6rpx 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .countdown-text {
@@ -872,10 +986,15 @@ page {
   transform: translateX(-50%);
 }
 
+.label-bottom-left {
+  top: 100%;
+  right: 0;
+}
+
 .final-text {
   position: absolute;
   left: 100%;
-  margin-left: 18rpx;
+  margin-left: 36rpx;
   top: 50%;
   transform: translateY(-50%);
   color: #ffffff;
@@ -885,16 +1004,48 @@ page {
   text-shadow: 0 2rpx 6rpx rgba(0,0,0,0.6);
 }
 
-/* Blinking Animation for active points */
-@keyframes softPulse {
-  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+/* Sonar pulse ring for crossed checkpoint dots */
+@keyframes sonarPulse {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(3.5); opacity: 0; }
 }
 
-.checkpoint-blinking {
-  animation: softPulse 1.5s infinite ease-in-out;
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: #660000;
+  animation: sonarPulse 1.5s infinite ease-out;
+  pointer-events: none;
 }
+
+.user-marker {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.user-marker-img {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.user-marker-steps {
+  position: absolute;
+  white-space: nowrap;
+  color: #ffffff;
+  font-size: 18rpx;
+  font-weight: 700;
+  text-shadow: 0 1rpx 4rpx rgba(0,0,0,0.9);
+}
+.user-steps-top    { bottom: 100%; margin-bottom: 6rpx; left: 50%; transform: translateX(-50%); }
+.user-steps-bottom { top: 100%;    margin-top: 6rpx;    left: 50%; transform: translateX(-50%); }
+.user-steps-left   { right: 100%; margin-right: 8rpx; top: 50%; transform: translateY(-50%); }
+.user-steps-right  { left: 100%;  margin-left: 8rpx;  top: 50%; transform: translateY(-50%); }
 
 /* ── Tab 2 ── */
 .tab2-wrapper {
@@ -976,7 +1127,7 @@ page {
 
 /* ── Bottom Nav ── */
 .bottom-nav {
-  background-color: rgba(30, 70, 45, 0.85);
+  background-color: #2c7c41;
   display: flex;
   flex-direction: row;
   align-items: center;

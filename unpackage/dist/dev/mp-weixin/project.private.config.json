@@ -1,6 +1,13 @@
 {
   "libVersion": "3.15.1",
   "projectname": "mp-weixin",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "envList": [
+    {
+      "envId": "cloud1-1gs1ugxif2016ac5",
+      "alias": "cloud1"
+    }
+  ],
   "condition": {},
   "setting": {
     "urlCheck": false,
