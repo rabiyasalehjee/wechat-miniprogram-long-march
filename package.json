@@ -1,0 +1,17 @@
+{
+	"name": "trail-1",
+	"version": "1.0.0",
+	"description": "UniApp Hello World - WeChat Mini Program",
+	"scripts": {
+		"dev:mp-weixin": "uni -p mp-weixin",
+		"build:mp-weixin": "uni build -p mp-weixin"
+	},
+	"dependencies": {
+		"@dcloudio/uni-app": "^3.0.0",
+		"vue": "^3.2.0"
+	},
+	"devDependencies": {
+		"@dcloudio/uni-mp-weixin": "^3.0.0",
+		"@vue/compiler-sfc": "^3.2.0"
+	}
+}
