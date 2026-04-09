@@ -134,11 +134,19 @@ page {
   justify-content: center;
   transform: translate(-50%, -50%);
   z-index: 2;
+  transition: all 0.5s ease;
 }
-.checkpoint-dot {
-  width: 12rpx; /* approx 5px-6px */
-  height: 12rpx;
-  background-color: #660000;
+.checkpoint-dot.checkpoint-active {
+  width: 14rpx;
+  height: 14rpx;
+  background-color: #660000; /* Active dark red */
+  border-radius: 50%;
+  box-shadow: 0 0 8rpx rgba(102, 0, 0, 0.5);
+}
+.checkpoint-dot.checkpoint-inactive {
+  width: 14rpx;
+  height: 14rpx;
+  background-color: rgba(255, 255, 255, 0.4); /* Inactive grey */
   border-radius: 50%;
 }
 .checkpoint-star {
@@ -146,9 +154,84 @@ page {
   border: none !important;
   box-shadow: none !important;
 }
+.checkpoint-star.checkpoint-active .cp-star {
+  color: #660000; /* Active dark red */
+  text-shadow: 0 0 10rpx rgba(102, 0, 0, 0.6);
+}
+.checkpoint-star.checkpoint-inactive .cp-star {
+  color: rgba(255, 255, 255, 0.5); /* Inactive grey */
+}
 .cp-star {
   font-size: 40rpx;
-  color: #660000; /* Dark red star */
+  transition: color 0.5s ease;
+}
+.checkpoint-label-container {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  pointer-events: none; /* Let touches pass through to points if needed */
+}
+.cp-label {
+  position: absolute;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: 500;
+  white-space: nowrap;
+  text-shadow: 0 2rpx 4rpx rgba(0,0,0,0.8);
+}
+
+/* Reduced margins to look tighter but still clear arrows/points */
+.label-right {
+  left: 100%;
+  margin-left: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.label-left {
+  right: 100%;
+  margin-right: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.label-top {
+  bottom: 100%;
+  margin-bottom: 18rpx;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.label-bottom {
+  top: 100%;
+  margin-top: 18rpx;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.final-text {
+  position: absolute;
+  left: 100%;
+  margin-left: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: 0 2rpx 6rpx rgba(0,0,0,0.6);
+}
+
+/* Blinking Animation for active points */
+@keyframes softPulse {
+0% { transform: translate(-50%, -50%) scale(1); opacity: 1;
+}
+50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7;
+}
+100% { transform: translate(-50%, -50%) scale(1); opacity: 1;
+}
+}
+.checkpoint-blinking {
+  animation: softPulse 1.5s infinite ease-in-out;
 }
 
 /* ── Tab 2 ── */

@@ -25,20 +25,40 @@
         </view>
       </view>
       <view class="tab1-content" id="map-container">
-        <!-- Route Canvas for Lines -->
-        <canvas canvas-id="routeCanvas" id="routeCanvas" class="route-canvas"></canvas>
+        <!-- Route Canvas for Lines (Using v-if to completely remove native component from DOM while modal is open) -->
+        <canvas 
+          v-if="!showProfileModal"
+          canvas-id="routeCanvas" 
+          id="routeCanvas" 
+          class="route-canvas"
+        ></canvas>
         
         <!-- Checkpoint Markers -->
         <view 
+          v-if="!showProfileModal"
           v-for="(cp, index) in checkpoints" 
           :key="index"
           class="checkpoint"
           :class="[
-            (index === 0 || index === checkpoints.length - 1) ? 'checkpoint-star' : 'checkpoint-dot'
+            (index === 0 || index === checkpoints.length - 1) ? 'checkpoint-star' : 'checkpoint-dot',
+            index < currentCheckpointIndex ? 'checkpoint-active' : 'checkpoint-inactive',
+            (index < currentCheckpointIndex && drawnSteps > 0) || (index === 0 && drawnSteps === 0) ? 'checkpoint-blinking' : ''
           ]"
           :style="{ left: cp.x + '%', top: cp.y + '%' }"
         >
           <text class="cp-star" v-if="index === 0 || index === checkpoints.length - 1">★</text>
+        </view>
+        
+        <!-- Checkpoint Labels (Rendered outside the blinking view to prevent blinking) -->
+        <view 
+          v-if="!showProfileModal"
+          v-for="(cp, index) in checkpoints" 
+          :key="'label-'+index"
+          class="checkpoint-label-container"
+          :style="{ left: cp.x + '%', top: cp.y + '%' }"
+        >
+          <text v-if="index === checkpoints.length - 1" class="final-text">终点150000步</text>
+          <text v-if="cp.label" class="cp-label" :class="'label-' + cp.pos" :style="cp.style">{{ cp.label }}</text>
         </view>
       </view>
     </view>
@@ -138,21 +158,24 @@ export default {
       pendingSyncCode: '',
       pendingSyncEncryptedData: '',
       pendingSyncIv: '',
+      drawnSteps: 0,
+      mapWidth: 0,
+      mapHeight: 0,
       // Map check points (1 to 13 based on the Long March route)
       checkpoints: [
-        { x: 85, y: 80 }, // 1. Ruijin
-        { x: 65, y: 84 }, // 2. 
-        { x: 50, y: 73 }, // 3. (Moved up by roughly 3%)
-        { x: 36, y: 68 }, // 4. 
-        { x: 25, y: 75 }, // 5. 
-        { x: 15, y: 65 }, // 6. 
-        { x: 22, y: 56 }, // 7. 
-        { x: 15, y: 48 }, // 8. 
-        { x: 22, y: 40 }, // 9. 
-        { x: 16, y: 32 }, // 10. 
-        { x: 24, y: 24 }, // 11. 
-        { x: 35, y: 16 }, // 12. 
-        { x: 55, y: 10 }  // 13. Yan'an (pushed back slightly to avoid overlap)
+        { x: 85, y: 80, label: '瑞金', pos: 'right', style: 'margin-left: 36rpx;' }, // 1. Extra gap
+        { x: 65, y: 84, label: '血战湘江', pos: 'bottom', style: 'margin-top: 24rpx;' }, // 2. Extra gap from downward curve
+        { x: 50, y: 73, label: '遵义会议', pos: 'right' }, // 3. 
+        { x: 36, y: 68, label: '四波赤水', pos: 'top' }, // 4. 
+        { x: 25, y: 75, label: '巧渡金沙江', pos: 'left' }, // 5. 
+        { x: 15, y: 65, label: '强渡大渡河', pos: 'right' }, // 6. 
+        { x: 22, y: 56, label: '飞夺泸定桥', pos: 'right' }, // 7. 
+        { x: 15, y: 48, label: '爬雪山', pos: 'left' }, // 8. 
+        { x: 22, y: 40, label: '懋功会师', pos: 'right' }, // 9. 
+        { x: 16, y: 32, label: '过草地', pos: 'left' }, // 10. 
+        { x: 24, y: 24, label: '激战腊子口', pos: 'right' }, // 11. 
+        { x: 35, y: 16, label: '大会师', pos: 'top', style: 'margin-bottom: 24rpx;' }, // 12. Extra gap from upward curve
+        { x: 55, y: 10 }  // 13. Yan'an
       ]
     }
   },
@@ -168,10 +191,22 @@ export default {
       return days > 0 ? days : 0;
     },
     currentCheckpointIndex() {
-      // 13 points = 12 segments. Calculate which points should be "lit up" based on total steps so far.
-      const ratio = this.todaysSteps / this.stepTarget;
-      const index = Math.floor(ratio * 13) + 1;
+      // 13 points = 12 segments.
+      if (this.stepTarget <= 0) return 0;
+      const ratio = Math.min(1, this.drawnSteps / this.stepTarget);
+      const index = Math.floor(ratio * 12) + 1; // 12 segments
       return index > 13 ? 13 : index;
+    },
+    completedSegments() {
+      if (this.stepTarget <= 0) return 0;
+      const stepsPerSegment = this.stepTarget / 12;
+      return Math.min(12, Math.floor(this.drawnSteps / stepsPerSegment));
+    },
+    currentSegmentProgress() {
+      if (this.stepTarget <= 0) return 0;
+      if (this.drawnSteps >= this.stepTarget) return 1;
+      const stepsPerSegment = this.stepTarget / 12;
+      return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
     }
   },
   mounted() {
@@ -187,21 +222,53 @@ export default {
     if (this.activeTab === 'today') {
       this.$nextTick(() => {
         setTimeout(() => {
-          this.drawMap();
+          this.initMapAndAnimate(0, this.todaysSteps);
         }, 300);
       });
     }
   },
   methods: {
-    drawMap() {
+    initMapAndAnimate(startSteps, targetSteps) {
+      if (this.mapWidth && this.mapHeight) {
+        this.animateMapProgress(startSteps, targetSteps);
+        return;
+      }
       const query = uni.createSelectorQuery().in(this);
       query.select('#map-container').boundingClientRect(data => {
-        if (!data) return;
-        const width = data.width;
-        const height = data.height;
+        if (data) {
+          this.mapWidth = data.width;
+          this.mapHeight = data.height;
+        }
+        this.animateMapProgress(startSteps, targetSteps);
+      }).exec();
+    },
+    animateMapProgress(startValue, endValue) {
+      const duration = 2000; // 2 seconds animation
+      const startTime = Date.now();
+      
+      const step = () => {
+        if (this.activeTab !== 'today') return; // Stop if user switched tabs
         
-        const ctx = uni.createCanvasContext('routeCanvas', this);
-        ctx.clearRect(0, 0, width, height);
+        const now = Date.now();
+        const progress = Math.min((now - startTime) / duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        
+        this.drawnSteps = Math.floor(startValue + (endValue - startValue) * easeProgress);
+        this.drawMap();
+        
+        if (progress < 1) {
+          setTimeout(step, 16); // ~60fps
+        }
+      };
+      step();
+    },
+    drawMap() {
+      if (!this.mapWidth || !this.mapHeight) return;
+      const width = this.mapWidth;
+      const height = this.mapHeight;
+      
+      const ctx = uni.createCanvasContext('routeCanvas', this);
+      ctx.clearRect(0, 0, width, height);
 
         // Convert percentage coordinates to pixels
         const points = this.checkpoints.map(cp => ({
@@ -209,90 +276,145 @@ export default {
           y: (cp.y / 100) * height
         }));
 
-        // Draw lines between checkpoints
-        for (let i = 0; i < points.length - 1; i++) {
-          const p1 = points[i];
-          const p2 = points[i + 1];
+      // First pass: Draw all inactive (grey) paths underneath
+      this.drawPathSegments(ctx, points, width, height, false);
+      // Second pass: Draw active (yellow) paths on top
+      this.drawPathSegments(ctx, points, width, height, true);
+      
+      ctx.draw();
+    },
+    drawPathSegments(ctx, points, width, height, isActivePass) {
+      for (let i = 0; i < points.length - 1; i++) {
+        // If we are doing the active pass and haven't reached this segment at all, skip
+        if (isActivePass && i > this.completedSegments) continue;
+        // If we are doing the inactive pass and this segment is fully completed, we don't strictly need to draw it, 
+        // but it's fine to draw underneath. Let's just draw all inactive, then overdraw active.
 
-          // Determine curve properties for specific segments
-          let isCurve = false;
-          let isSingleZig = false;
-          let cx = 0, cy = 0;
+        const p1 = points[i];
+        const p2 = points[i + 1];
 
-          if (i === 0) {
-            // Bend line between 1 and 2 (index 0 and 1) downwards
-            isCurve = true;
-            cx = (p1.x + p2.x) / 2;
-            cy = Math.max(p1.y, p2.y) + 40;
-          } else if (i === 1) {
-            // Bend line between 2 and 3 slightly towards the bottom (reduced bend)
-            isCurve = true;
-            cx = (p1.x + p2.x) / 2;
-            cy = Math.max(p1.y, p2.y) + 12;
-          } else if (i === 3) {
-            // Bend line between 4 and 5, shifted further to the right
-            isCurve = true;
-            cx = (p1.x + p2.x) / 2 + 35; 
-            cy = Math.max(p1.y, p2.y) + 60; 
-          } else if (i === 11) {
-            // Reduced bend with a single sharp "zig" in the middle
-            isSingleZig = true;
-            cx = (p1.x + p2.x) / 2 - 5; // slight horizontal shift for the zig
-            cy = Math.min(p1.y, p2.y) - 25; // reduced bend (was -60)
-          }
+        let isCurve = false;
+        let isSingleZig = false;
+        let cx = 0, cy = 0;
 
-          // Leave clear gaps so lines don't touch points or arrowheads
-          // Reduced gaps to be tighter around the smaller dots
-          const startRadius = (i === 0) ? 14 : 8; 
-          const endRadius = (i + 1 === points.length - 1) ? 18 : 10; 
+        if (i === 0) {
+          isCurve = true;
+          cx = (p1.x + p2.x) / 2;
+          cy = Math.max(p1.y, p2.y) + 40;
+        } else if (i === 1) {
+          isCurve = true;
+          cx = (p1.x + p2.x) / 2;
+          cy = Math.max(p1.y, p2.y) + 12;
+        } else if (i === 3) {
+          isCurve = true;
+          cx = (p1.x + p2.x) / 2 + 35; 
+          cy = Math.max(p1.y, p2.y) + 60; 
+        } else if (i === 11) {
+          isSingleZig = true;
+          cx = (p1.x + p2.x) / 2 - 5; 
+          cy = Math.min(p1.y, p2.y) - 25; 
+        }
+
+        const startRadius = (i === 0) ? 14 : 8; 
+        const endRadius = (i + 1 === points.length - 1) ? 18 : 10; 
+        
+        let startX, startY, endX, endY, endAngle;
+
+        if (isCurve || isSingleZig) {
+          const angStart = Math.atan2(cy - p1.y, cx - p1.x);
+          startX = p1.x + startRadius * Math.cos(angStart);
+          startY = p1.y + startRadius * Math.sin(angStart);
           
-          let startX, startY, endX, endY, endAngle;
+          const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
+          endX = p2.x - endRadius * Math.cos(angEnd);
+          endY = p2.y - endRadius * Math.sin(angEnd);
+          endAngle = angEnd;
+        } else {
+          const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+          startX = p1.x + startRadius * Math.cos(angle);
+          startY = p1.y + startRadius * Math.sin(angle);
+          endX = p2.x - endRadius * Math.cos(angle);
+          endY = p2.y - endRadius * Math.sin(angle);
+          endAngle = angle;
+        }
 
-          if (isCurve || isSingleZig) {
-            const angStart = Math.atan2(cy - p1.y, cx - p1.x);
-            startX = p1.x + startRadius * Math.cos(angStart);
-            startY = p1.y + startRadius * Math.sin(angStart);
-            
-            const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
-            endX = p2.x - endRadius * Math.cos(angEnd);
-            endY = p2.y - endRadius * Math.sin(angEnd);
-            endAngle = angEnd;
-          } else {
-            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-            startX = p1.x + startRadius * Math.cos(angle);
-            startY = p1.y + startRadius * Math.sin(angle);
-            endX = p2.x - endRadius * Math.cos(angle);
-            endY = p2.y - endRadius * Math.sin(angle);
-            endAngle = angle;
-          }
+        // To prevent transparent grey lines from overlapping with the grey arrowhead and creating a darker artifact,
+        // we stop the line exactly at the flat base of the arrowhead (14 * cos(30deg) ≈ 12.1px).
+        // For the solid active yellow line, a slight overlap (10px) is fine and prevents micro-gaps.
+        const overlapOffset = isActivePass ? 10 : 12.1;
+        const lineEndX = endX - overlapOffset * Math.cos(endAngle);
+        const lineEndY = endY - overlapOffset * Math.sin(endAngle);
 
-          // Stop the main line deep inside the arrowhead base so no rounded or square edge pokes out the tip
-          const lineEndX = endX - 10 * Math.cos(endAngle);
-          const lineEndY = endY - 10 * Math.sin(endAngle);
+        const isFullyActive = isActivePass && i < this.completedSegments;
+        const isPartiallyActive = isActivePass && i === this.completedSegments;
+        const progress = isPartiallyActive ? this.currentSegmentProgress : 1.0;
 
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          
+        // Skip drawing an empty active segment
+        if (isActivePass && progress <= 0) continue;
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+
+        if (progress >= 1.0) {
+          // Draw full segment
           if (isCurve) {
             ctx.quadraticCurveTo(cx, cy, lineEndX, lineEndY);
           } else if (isSingleZig) {
-            ctx.lineTo(cx, cy); // Draw the sharp zig point
+            ctx.lineTo(cx, cy); 
             ctx.lineTo(lineEndX, lineEndY);
           } else {
             ctx.lineTo(lineEndX, lineEndY);
           }
+        } else {
+          // Draw partial segment smoothly using exact progress
+          const curveRes = 50; // High resolution for smooth curves
+          const maxStep = Math.ceil(curveRes * progress);
           
-          // Thicker, solid yellow line (removed round cap to keep corners sharp)
-          ctx.setStrokeStyle('#f5d76e');
-          ctx.setLineWidth(5);
-          ctx.stroke();
+          for (let step = 1; step <= maxStep; step++) {
+            // Ensure the final step lands exactly on the continuous progress value
+            const t = Math.min(step / curveRes, progress);
+            let currentX, currentY;
+            
+            if (isCurve) {
+              currentX = Math.pow(1 - t, 2) * startX + 2 * (1 - t) * t * cx + Math.pow(t, 2) * lineEndX;
+              currentY = Math.pow(1 - t, 2) * startY + 2 * (1 - t) * t * cy + Math.pow(t, 2) * lineEndY;
+            } else if (isSingleZig) {
+              if (t < 0.5) {
+                const nt = t * 2;
+                currentX = startX + (cx - startX) * nt;
+                currentY = startY + (cy - startY) * nt;
+              } else {
+                const nt = (t - 0.5) * 2;
+                currentX = cx + (lineEndX - cx) * nt;
+                currentY = cy + (lineEndY - cy) * nt;
+              }
+            } else {
+              currentX = startX + (lineEndX - startX) * t;
+              currentY = startY + (lineEndY - startY) * t;
+            }
+            ctx.lineTo(currentX, currentY);
+          }
+        }
 
+        ctx.setStrokeStyle(isActivePass ? '#f5d76e' : 'rgba(255, 255, 255, 0.2)');
+        ctx.setLineWidth(5);
+        ctx.stroke();
+
+        // Only draw arrowheads if the segment is fully active (or for the inactive background)
+        if (!isActivePass || isFullyActive) {
           if (i === 11) {
-            // Draw a small checkpoint image instead of an arrowhead for the last arrow
-            const imgSize = 24;
-            ctx.drawImage('/static/checkpoint.png', endX - imgSize/2, endY - imgSize/2, imgSize, imgSize);
+            if (isActivePass || !this.isActivePass) {
+               // Only draw icon once, on the active pass if active, or inactive pass if not reached
+               const shouldDrawIcon = (isActivePass && isFullyActive) || (!isActivePass && !isFullyActive);
+               if (shouldDrawIcon) {
+                 const imgSize = 24;
+                 // Set global alpha for greyed out image if inactive
+                 if (!isActivePass) ctx.setGlobalAlpha(0.3);
+                 ctx.drawImage('/static/checkpoint.png', endX - imgSize/2, endY - imgSize/2, imgSize, imgSize);
+                 if (!isActivePass) ctx.setGlobalAlpha(1.0);
+               }
+            }
           } else {
-            // Draw regular arrowhead exactly at endX, endY
             const arrowLength = 14;
             ctx.beginPath();
             ctx.moveTo(endX, endY);
@@ -304,14 +426,12 @@ export default {
               endX - arrowLength * Math.cos(endAngle + Math.PI / 6),
               endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
             );
-            ctx.closePath(); // Closes the triangle cleanly for sharp points
-            ctx.fillStyle = '#f5d76e';
+            ctx.closePath();
+            ctx.fillStyle = isActivePass ? '#f5d76e' : 'rgba(255, 255, 255, 0.2)';
             ctx.fill();
           }
         }
-        
-        ctx.draw();
-      }).exec();
+      }
     },
     loadLocalData() {
       const savedSteps = uni.getStorageSync('totalStepsHistory');
@@ -334,8 +454,9 @@ export default {
       } else if (tab === 'today') {
         this.$nextTick(() => {
           setTimeout(() => {
-            this.drawMap();
-          }, 300);
+            this.drawnSteps = this.todaysSteps; // Snap directly on tab switch
+            this.initMapAndAnimate(this.todaysSteps, this.todaysSteps);
+          }, 100);
         });
       }
     },
@@ -373,10 +494,21 @@ export default {
       }
       this.userNickname = name;
       this.showProfileModal = false;
+      
+      // Redraw map after modal closes (since v-if destroyed the canvas)
+      this.$nextTick(() => {
+        setTimeout(() => this.drawMap(), 300);
+      });
+      
       this.uploadAvatarAndSync(this.tempAvatarUrl, name);
     },
     cancelProfile() {
       this.showProfileModal = false;
+      
+      // Redraw map after modal closes
+      this.$nextTick(() => {
+        setTimeout(() => this.drawMap(), 300);
+      });
     },
     syncWeRunData() {
       uni.showLoading({ title: '准备中...' });
@@ -476,9 +608,15 @@ export default {
         success: (res) => {
           uni.hideLoading();
           if (res.result && res.result.success) {
+            const oldSteps = that.todaysSteps;
             that.todaysSteps = res.result.todaySteps;
             that.saveData();
             uni.showToast({ title: '步数已更新！', icon: 'success' });
+            
+            // Animate growth from old to new steps
+            if (that.activeTab === 'today') {
+              that.initMapAndAnimate(oldSteps, that.todaysSteps);
+            }
           } else {
             uni.showToast({ title: res.result.msg || '出错了，请重试', icon: 'none' });
             console.error('syncSteps failed:', res.result);
@@ -648,12 +786,21 @@ page {
   justify-content: center;
   transform: translate(-50%, -50%);
   z-index: 2;
+  transition: all 0.5s ease;
 }
 
-.checkpoint-dot {
-  width: 12rpx; /* approx 5px-6px */
-  height: 12rpx;
-  background-color: #660000;
+.checkpoint-dot.checkpoint-active {
+  width: 14rpx;
+  height: 14rpx;
+  background-color: #660000; /* Active dark red */
+  border-radius: 50%;
+  box-shadow: 0 0 8rpx rgba(102, 0, 0, 0.5);
+}
+
+.checkpoint-dot.checkpoint-inactive {
+  width: 14rpx;
+  height: 14rpx;
+  background-color: rgba(255, 255, 255, 0.4); /* Inactive grey */
   border-radius: 50%;
 }
 
@@ -663,9 +810,90 @@ page {
   box-shadow: none !important;
 }
 
+.checkpoint-star.checkpoint-active .cp-star {
+  color: #660000; /* Active dark red */
+  text-shadow: 0 0 10rpx rgba(102, 0, 0, 0.6);
+}
+
+.checkpoint-star.checkpoint-inactive .cp-star {
+  color: rgba(255, 255, 255, 0.5); /* Inactive grey */
+}
+
 .cp-star {
   font-size: 40rpx;
-  color: #660000; /* Dark red star */
+  transition: color 0.5s ease;
+}
+
+.checkpoint-label-container {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  pointer-events: none; /* Let touches pass through to points if needed */
+}
+
+.cp-label {
+  position: absolute;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: 500;
+  white-space: nowrap;
+  text-shadow: 0 2rpx 4rpx rgba(0,0,0,0.8);
+}
+
+/* Reduced margins to look tighter but still clear arrows/points */
+.label-right {
+  left: 100%;
+  margin-left: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.label-left {
+  right: 100%;
+  margin-right: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.label-top {
+  bottom: 100%;
+  margin-bottom: 18rpx;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.label-bottom {
+  top: 100%;
+  margin-top: 18rpx;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.final-text {
+  position: absolute;
+  left: 100%;
+  margin-left: 18rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: 0 2rpx 6rpx rgba(0,0,0,0.6);
+}
+
+/* Blinking Animation for active points */
+@keyframes softPulse {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+.checkpoint-blinking {
+  animation: softPulse 1.5s infinite ease-in-out;
 }
 
 /* ── Tab 2 ── */

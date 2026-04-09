@@ -20,34 +20,37 @@ const _sfc_main = {
       pendingSyncCode: "",
       pendingSyncEncryptedData: "",
       pendingSyncIv: "",
+      drawnSteps: 0,
+      mapWidth: 0,
+      mapHeight: 0,
       // Map check points (1 to 13 based on the Long March route)
       checkpoints: [
-        { x: 85, y: 80 },
-        // 1. Ruijin
-        { x: 65, y: 84 },
-        // 2. 
-        { x: 50, y: 73 },
-        // 3. (Moved up by roughly 3%)
-        { x: 36, y: 68 },
+        { x: 85, y: 80, label: "瑞金", pos: "right", style: "margin-left: 36rpx;" },
+        // 1. Extra gap
+        { x: 65, y: 84, label: "血战湘江", pos: "bottom", style: "margin-top: 24rpx;" },
+        // 2. Extra gap from downward curve
+        { x: 50, y: 73, label: "遵义会议", pos: "right" },
+        // 3. 
+        { x: 36, y: 68, label: "四波赤水", pos: "top" },
         // 4. 
-        { x: 25, y: 75 },
+        { x: 25, y: 75, label: "巧渡金沙江", pos: "left" },
         // 5. 
-        { x: 15, y: 65 },
+        { x: 15, y: 65, label: "强渡大渡河", pos: "right" },
         // 6. 
-        { x: 22, y: 56 },
+        { x: 22, y: 56, label: "飞夺泸定桥", pos: "right" },
         // 7. 
-        { x: 15, y: 48 },
+        { x: 15, y: 48, label: "爬雪山", pos: "left" },
         // 8. 
-        { x: 22, y: 40 },
+        { x: 22, y: 40, label: "懋功会师", pos: "right" },
         // 9. 
-        { x: 16, y: 32 },
+        { x: 16, y: 32, label: "过草地", pos: "left" },
         // 10. 
-        { x: 24, y: 24 },
+        { x: 24, y: 24, label: "激战腊子口", pos: "right" },
         // 11. 
-        { x: 35, y: 16 },
-        // 12. 
+        { x: 35, y: 16, label: "大会师", pos: "top", style: "margin-bottom: 24rpx;" },
+        // 12. Extra gap from upward curve
         { x: 55, y: 10 }
-        // 13. Yan'an (pushed back slightly to avoid overlap)
+        // 13. Yan'an
       ]
     };
   },
@@ -63,9 +66,25 @@ const _sfc_main = {
       return days > 0 ? days : 0;
     },
     currentCheckpointIndex() {
-      const ratio = this.todaysSteps / this.stepTarget;
-      const index = Math.floor(ratio * 13) + 1;
+      if (this.stepTarget <= 0)
+        return 0;
+      const ratio = Math.min(1, this.drawnSteps / this.stepTarget);
+      const index = Math.floor(ratio * 12) + 1;
       return index > 13 ? 13 : index;
+    },
+    completedSegments() {
+      if (this.stepTarget <= 0)
+        return 0;
+      const stepsPerSegment = this.stepTarget / 12;
+      return Math.min(12, Math.floor(this.drawnSteps / stepsPerSegment));
+    },
+    currentSegmentProgress() {
+      if (this.stepTarget <= 0)
+        return 0;
+      if (this.drawnSteps >= this.stepTarget)
+        return 1;
+      const stepsPerSegment = this.stepTarget / 12;
+      return this.drawnSteps % stepsPerSegment / stepsPerSegment;
     }
   },
   mounted() {
@@ -79,71 +98,114 @@ const _sfc_main = {
     if (this.activeTab === "today") {
       this.$nextTick(() => {
         setTimeout(() => {
-          this.drawMap();
+          this.initMapAndAnimate(0, this.todaysSteps);
         }, 300);
       });
     }
   },
   methods: {
-    drawMap() {
+    initMapAndAnimate(startSteps, targetSteps) {
+      if (this.mapWidth && this.mapHeight) {
+        this.animateMapProgress(startSteps, targetSteps);
+        return;
+      }
       const query = common_vendor.index.createSelectorQuery().in(this);
       query.select("#map-container").boundingClientRect((data) => {
-        if (!data)
+        if (data) {
+          this.mapWidth = data.width;
+          this.mapHeight = data.height;
+        }
+        this.animateMapProgress(startSteps, targetSteps);
+      }).exec();
+    },
+    animateMapProgress(startValue, endValue) {
+      const duration = 2e3;
+      const startTime = Date.now();
+      const step = () => {
+        if (this.activeTab !== "today")
           return;
-        const width = data.width;
-        const height = data.height;
-        const ctx = common_vendor.index.createCanvasContext("routeCanvas", this);
-        ctx.clearRect(0, 0, width, height);
-        const points = this.checkpoints.map((cp) => ({
-          x: cp.x / 100 * width,
-          y: cp.y / 100 * height
-        }));
-        for (let i = 0; i < points.length - 1; i++) {
-          const p1 = points[i];
-          const p2 = points[i + 1];
-          let isCurve = false;
-          let isSingleZig = false;
-          let cx = 0, cy = 0;
-          if (i === 0) {
-            isCurve = true;
-            cx = (p1.x + p2.x) / 2;
-            cy = Math.max(p1.y, p2.y) + 40;
-          } else if (i === 1) {
-            isCurve = true;
-            cx = (p1.x + p2.x) / 2;
-            cy = Math.max(p1.y, p2.y) + 12;
-          } else if (i === 3) {
-            isCurve = true;
-            cx = (p1.x + p2.x) / 2 + 35;
-            cy = Math.max(p1.y, p2.y) + 60;
-          } else if (i === 11) {
-            isSingleZig = true;
-            cx = (p1.x + p2.x) / 2 - 5;
-            cy = Math.min(p1.y, p2.y) - 25;
-          }
-          const startRadius = i === 0 ? 14 : 8;
-          const endRadius = i + 1 === points.length - 1 ? 18 : 10;
-          let startX, startY, endX, endY, endAngle;
-          if (isCurve || isSingleZig) {
-            const angStart = Math.atan2(cy - p1.y, cx - p1.x);
-            startX = p1.x + startRadius * Math.cos(angStart);
-            startY = p1.y + startRadius * Math.sin(angStart);
-            const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
-            endX = p2.x - endRadius * Math.cos(angEnd);
-            endY = p2.y - endRadius * Math.sin(angEnd);
-            endAngle = angEnd;
-          } else {
-            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-            startX = p1.x + startRadius * Math.cos(angle);
-            startY = p1.y + startRadius * Math.sin(angle);
-            endX = p2.x - endRadius * Math.cos(angle);
-            endY = p2.y - endRadius * Math.sin(angle);
-            endAngle = angle;
-          }
-          const lineEndX = endX - 10 * Math.cos(endAngle);
-          const lineEndY = endY - 10 * Math.sin(endAngle);
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
+        const now = Date.now();
+        const progress = Math.min((now - startTime) / duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        this.drawnSteps = Math.floor(startValue + (endValue - startValue) * easeProgress);
+        this.drawMap();
+        if (progress < 1) {
+          setTimeout(step, 16);
+        }
+      };
+      step();
+    },
+    drawMap() {
+      if (!this.mapWidth || !this.mapHeight)
+        return;
+      const width = this.mapWidth;
+      const height = this.mapHeight;
+      const ctx = common_vendor.index.createCanvasContext("routeCanvas", this);
+      ctx.clearRect(0, 0, width, height);
+      const points = this.checkpoints.map((cp) => ({
+        x: cp.x / 100 * width,
+        y: cp.y / 100 * height
+      }));
+      this.drawPathSegments(ctx, points, width, height, false);
+      this.drawPathSegments(ctx, points, width, height, true);
+      ctx.draw();
+    },
+    drawPathSegments(ctx, points, width, height, isActivePass) {
+      for (let i = 0; i < points.length - 1; i++) {
+        if (isActivePass && i > this.completedSegments)
+          continue;
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        let isCurve = false;
+        let isSingleZig = false;
+        let cx = 0, cy = 0;
+        if (i === 0) {
+          isCurve = true;
+          cx = (p1.x + p2.x) / 2;
+          cy = Math.max(p1.y, p2.y) + 40;
+        } else if (i === 1) {
+          isCurve = true;
+          cx = (p1.x + p2.x) / 2;
+          cy = Math.max(p1.y, p2.y) + 12;
+        } else if (i === 3) {
+          isCurve = true;
+          cx = (p1.x + p2.x) / 2 + 35;
+          cy = Math.max(p1.y, p2.y) + 60;
+        } else if (i === 11) {
+          isSingleZig = true;
+          cx = (p1.x + p2.x) / 2 - 5;
+          cy = Math.min(p1.y, p2.y) - 25;
+        }
+        const startRadius = i === 0 ? 14 : 8;
+        const endRadius = i + 1 === points.length - 1 ? 18 : 10;
+        let startX, startY, endX, endY, endAngle;
+        if (isCurve || isSingleZig) {
+          const angStart = Math.atan2(cy - p1.y, cx - p1.x);
+          startX = p1.x + startRadius * Math.cos(angStart);
+          startY = p1.y + startRadius * Math.sin(angStart);
+          const angEnd = Math.atan2(p2.y - cy, p2.x - cx);
+          endX = p2.x - endRadius * Math.cos(angEnd);
+          endY = p2.y - endRadius * Math.sin(angEnd);
+          endAngle = angEnd;
+        } else {
+          const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+          startX = p1.x + startRadius * Math.cos(angle);
+          startY = p1.y + startRadius * Math.sin(angle);
+          endX = p2.x - endRadius * Math.cos(angle);
+          endY = p2.y - endRadius * Math.sin(angle);
+          endAngle = angle;
+        }
+        const overlapOffset = isActivePass ? 10 : 12.1;
+        const lineEndX = endX - overlapOffset * Math.cos(endAngle);
+        const lineEndY = endY - overlapOffset * Math.sin(endAngle);
+        const isFullyActive = isActivePass && i < this.completedSegments;
+        const isPartiallyActive = isActivePass && i === this.completedSegments;
+        const progress = isPartiallyActive ? this.currentSegmentProgress : 1;
+        if (isActivePass && progress <= 0)
+          continue;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        if (progress >= 1) {
           if (isCurve) {
             ctx.quadraticCurveTo(cx, cy, lineEndX, lineEndY);
           } else if (isSingleZig) {
@@ -152,12 +214,48 @@ const _sfc_main = {
           } else {
             ctx.lineTo(lineEndX, lineEndY);
           }
-          ctx.setStrokeStyle("#f5d76e");
-          ctx.setLineWidth(5);
-          ctx.stroke();
+        } else {
+          const curveRes = 50;
+          const maxStep = Math.ceil(curveRes * progress);
+          for (let step = 1; step <= maxStep; step++) {
+            const t = Math.min(step / curveRes, progress);
+            let currentX, currentY;
+            if (isCurve) {
+              currentX = Math.pow(1 - t, 2) * startX + 2 * (1 - t) * t * cx + Math.pow(t, 2) * lineEndX;
+              currentY = Math.pow(1 - t, 2) * startY + 2 * (1 - t) * t * cy + Math.pow(t, 2) * lineEndY;
+            } else if (isSingleZig) {
+              if (t < 0.5) {
+                const nt = t * 2;
+                currentX = startX + (cx - startX) * nt;
+                currentY = startY + (cy - startY) * nt;
+              } else {
+                const nt = (t - 0.5) * 2;
+                currentX = cx + (lineEndX - cx) * nt;
+                currentY = cy + (lineEndY - cy) * nt;
+              }
+            } else {
+              currentX = startX + (lineEndX - startX) * t;
+              currentY = startY + (lineEndY - startY) * t;
+            }
+            ctx.lineTo(currentX, currentY);
+          }
+        }
+        ctx.setStrokeStyle(isActivePass ? "#f5d76e" : "rgba(255, 255, 255, 0.2)");
+        ctx.setLineWidth(5);
+        ctx.stroke();
+        if (!isActivePass || isFullyActive) {
           if (i === 11) {
-            const imgSize = 24;
-            ctx.drawImage("/static/checkpoint.png", endX - imgSize / 2, endY - imgSize / 2, imgSize, imgSize);
+            if (isActivePass || !this.isActivePass) {
+              const shouldDrawIcon = isActivePass && isFullyActive || !isActivePass && !isFullyActive;
+              if (shouldDrawIcon) {
+                const imgSize = 24;
+                if (!isActivePass)
+                  ctx.setGlobalAlpha(0.3);
+                ctx.drawImage("/static/checkpoint.png", endX - imgSize / 2, endY - imgSize / 2, imgSize, imgSize);
+                if (!isActivePass)
+                  ctx.setGlobalAlpha(1);
+              }
+            }
           } else {
             const arrowLength = 14;
             ctx.beginPath();
@@ -171,12 +269,11 @@ const _sfc_main = {
               endY - arrowLength * Math.sin(endAngle + Math.PI / 6)
             );
             ctx.closePath();
-            ctx.fillStyle = "#f5d76e";
+            ctx.fillStyle = isActivePass ? "#f5d76e" : "rgba(255, 255, 255, 0.2)";
             ctx.fill();
           }
         }
-        ctx.draw();
-      }).exec();
+      }
     },
     loadLocalData() {
       const savedSteps = common_vendor.index.getStorageSync("totalStepsHistory");
@@ -199,8 +296,9 @@ const _sfc_main = {
       } else if (tab === "today") {
         this.$nextTick(() => {
           setTimeout(() => {
-            this.drawMap();
-          }, 300);
+            this.drawnSteps = this.todaysSteps;
+            this.initMapAndAnimate(this.todaysSteps, this.todaysSteps);
+          }, 100);
         });
       }
     },
@@ -214,7 +312,7 @@ const _sfc_main = {
           this.leaderboardLoading = false;
         },
         fail: (err) => {
-          common_vendor.index.__f__("error", "at pages/index/index.vue:354", "Leaderboard fetch failed:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:475", "Leaderboard fetch failed:", err);
           this.leaderboardLoading = false;
         }
       });
@@ -237,10 +335,16 @@ const _sfc_main = {
       }
       this.userNickname = name;
       this.showProfileModal = false;
+      this.$nextTick(() => {
+        setTimeout(() => this.drawMap(), 300);
+      });
       this.uploadAvatarAndSync(this.tempAvatarUrl, name);
     },
     cancelProfile() {
       this.showProfileModal = false;
+      this.$nextTick(() => {
+        setTimeout(() => this.drawMap(), 300);
+      });
     },
     syncWeRunData() {
       common_vendor.index.showLoading({ title: "准备中..." });
@@ -271,7 +375,7 @@ const _sfc_main = {
             fail(err) {
               common_vendor.index.hideLoading();
               common_vendor.index.showToast({ title: "读取数据失败", icon: "none" });
-              common_vendor.index.__f__("error", "at pages/index/index.vue:410", err);
+              common_vendor.index.__f__("error", "at pages/index/index.vue:542", err);
             }
           });
         },
@@ -295,7 +399,7 @@ const _sfc_main = {
             that._uploadLocalFileAndSync(dlRes.tempFilePath, nickname);
           },
           fail: (err) => {
-            common_vendor.index.__f__("error", "at pages/index/index.vue:436", "Avatar download failed:", err);
+            common_vendor.index.__f__("error", "at pages/index/index.vue:568", "Avatar download failed:", err);
             common_vendor.index.hideLoading();
             that.doSync(nickname, "");
           }
@@ -320,7 +424,7 @@ const _sfc_main = {
           that.doSync(nickname, cloudUrl);
         },
         fail: (err) => {
-          common_vendor.index.__f__("error", "at pages/index/index.vue:461", "Avatar upload failed:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:593", "Avatar upload failed:", err);
           common_vendor.index.hideLoading();
           that.doSync(nickname, "");
         }
@@ -338,18 +442,22 @@ const _sfc_main = {
         success: (res) => {
           common_vendor.index.hideLoading();
           if (res.result && res.result.success) {
+            const oldSteps = that.todaysSteps;
             that.todaysSteps = res.result.todaySteps;
             that.saveData();
             common_vendor.index.showToast({ title: "步数已更新！", icon: "success" });
+            if (that.activeTab === "today") {
+              that.initMapAndAnimate(oldSteps, that.todaysSteps);
+            }
           } else {
             common_vendor.index.showToast({ title: res.result.msg || "出错了，请重试", icon: "none" });
-            common_vendor.index.__f__("error", "at pages/index/index.vue:484", "syncSteps failed:", res.result);
+            common_vendor.index.__f__("error", "at pages/index/index.vue:622", "syncSteps failed:", res.result);
           }
         },
         fail: (err) => {
           common_vendor.index.hideLoading();
           common_vendor.index.showToast({ title: "同步失败，请重试", icon: "none" });
-          common_vendor.index.__f__("error", "at pages/index/index.vue:490", "callFunction fail:", err);
+          common_vendor.index.__f__("error", "at pages/index/index.vue:628", "callFunction fail:", err);
         }
       });
     }
@@ -363,25 +471,49 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
     d: common_vendor.t($options.remainingSteps),
     e: common_vendor.o((...args) => $options.syncWeRunData && $options.syncWeRunData(...args)),
     f: $data.activeTab === "today"
-  }, $data.activeTab === "today" ? {
+  }, $data.activeTab === "today" ? common_vendor.e({
     g: common_assets._imports_1,
     h: common_vendor.t($options.daysLeft),
-    i: common_vendor.f($data.checkpoints, (cp, index, i0) => {
+    i: !$data.showProfileModal
+  }, !$data.showProfileModal ? {} : {}, {
+    j: !$data.showProfileModal
+  }, !$data.showProfileModal ? {
+    k: common_vendor.f($data.checkpoints, (cp, index, i0) => {
       return common_vendor.e({
         a: index === 0 || index === $data.checkpoints.length - 1
       }, index === 0 || index === $data.checkpoints.length - 1 ? {} : {}, {
         b: index,
         c: common_vendor.n(index === 0 || index === $data.checkpoints.length - 1 ? "checkpoint-star" : "checkpoint-dot"),
-        d: cp.x + "%",
-        e: cp.y + "%"
+        d: common_vendor.n(index < $options.currentCheckpointIndex ? "checkpoint-active" : "checkpoint-inactive"),
+        e: common_vendor.n(index < $options.currentCheckpointIndex && $data.drawnSteps > 0 || index === 0 && $data.drawnSteps === 0 ? "checkpoint-blinking" : ""),
+        f: cp.x + "%",
+        g: cp.y + "%"
       });
     })
   } : {}, {
-    j: $data.activeTab === "period"
+    l: !$data.showProfileModal
+  }, !$data.showProfileModal ? {
+    m: common_vendor.f($data.checkpoints, (cp, index, i0) => {
+      return common_vendor.e({
+        a: index === $data.checkpoints.length - 1
+      }, index === $data.checkpoints.length - 1 ? {} : {}, {
+        b: cp.label
+      }, cp.label ? {
+        c: common_vendor.t(cp.label),
+        d: common_vendor.n("label-" + cp.pos),
+        e: common_vendor.s(cp.style)
+      } : {}, {
+        f: "label-" + index,
+        g: cp.x + "%",
+        h: cp.y + "%"
+      });
+    })
+  } : {}) : {}, {
+    n: $data.activeTab === "period"
   }, $data.activeTab === "period" ? common_vendor.e({
-    k: $data.leaderboardLoading
+    o: $data.leaderboardLoading
   }, $data.leaderboardLoading ? {} : common_vendor.e({
-    l: common_vendor.f($data.leaderboard, (item, index, i0) => {
+    p: common_vendor.f($data.leaderboard, (item, index, i0) => {
       return {
         a: common_vendor.t(index + 1),
         b: index < 3 ? 1 : "",
@@ -391,23 +523,23 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
         f: item._openid
       };
     }),
-    m: $data.leaderboard.length === 0
+    q: $data.leaderboard.length === 0
   }, $data.leaderboard.length === 0 ? {} : {})) : {}, {
-    n: $data.activeTab === "today"
+    r: $data.activeTab === "today"
   }, $data.activeTab === "today" ? {} : {}, {
-    o: common_vendor.o(($event) => $options.switchTab("today")),
-    p: $data.activeTab === "period"
+    s: common_vendor.o(($event) => $options.switchTab("today")),
+    t: $data.activeTab === "period"
   }, $data.activeTab === "period" ? {} : {}, {
-    q: common_vendor.o(($event) => $options.switchTab("period")),
-    r: $data.showProfileModal
+    v: common_vendor.o(($event) => $options.switchTab("period")),
+    w: $data.showProfileModal
   }, $data.showProfileModal ? {
-    s: $data.tempAvatarUrl || "/static/default-avatar.png",
-    t: common_vendor.o((...args) => $options.onChooseAvatar && $options.onChooseAvatar(...args)),
-    v: $data.tempNickname,
-    w: common_vendor.o((...args) => $options.onNicknameBlur && $options.onNicknameBlur(...args)),
-    x: common_vendor.o((...args) => $options.onNicknameChange && $options.onNicknameChange(...args)),
-    y: common_vendor.o((...args) => $options.confirmProfile && $options.confirmProfile(...args)),
-    z: common_vendor.o((...args) => $options.cancelProfile && $options.cancelProfile(...args))
+    x: $data.tempAvatarUrl || "/static/default-avatar.png",
+    y: common_vendor.o((...args) => $options.onChooseAvatar && $options.onChooseAvatar(...args)),
+    z: $data.tempNickname,
+    A: common_vendor.o((...args) => $options.onNicknameBlur && $options.onNicknameBlur(...args)),
+    B: common_vendor.o((...args) => $options.onNicknameChange && $options.onNicknameChange(...args)),
+    C: common_vendor.o((...args) => $options.confirmProfile && $options.confirmProfile(...args)),
+    D: common_vendor.o((...args) => $options.cancelProfile && $options.cancelProfile(...args))
   } : {});
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render]]);
