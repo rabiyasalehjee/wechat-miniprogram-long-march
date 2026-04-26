@@ -138,6 +138,7 @@
             <text class="team-header-sub" v-if="myTeam === selectedViewTeam">我的团队 · {{ myStudentId }}</text>
             <text class="team-header-sub" v-else>活动周期：2026.05.04 — 2026.10.22</text>
           </view>
+          <button v-if="myTeam === selectedViewTeam" class="team-leave-btn" @click="leaveTeam">退出</button>
           <view class="team-header-stat">
             <text class="team-total-km">{{ teamTotalKm }}</text>
             <text class="team-total-km-unit">公里</text>
@@ -200,29 +201,24 @@
           <text class="stats-label">今日步数</text>
           <text class="stats-value">{{ todaysSteps.toLocaleString() }}</text>
         </view>
-        <view class="stats-divider-v"></view>
         <view class="stats-cell">
           <text class="stats-label">今日里程</text>
           <text class="stats-value">{{ todayKm }} <text class="stats-unit">公里</text></text>
         </view>
-        <view class="stats-divider-v"></view>
         <view class="stats-cell">
           <text class="stats-label">今日排名</text>
           <text class="stats-value stats-rank">{{ todayRank === '无' ? '暂无排名' : '第 ' + todayRank + ' 名' }}</text>
         </view>
       </view>
-      <view class="stats-divider-h"></view>
       <view class="stats-row">
         <view class="stats-cell">
           <text class="stats-label">兑换比例</text>
           <text class="stats-value stats-small">1步 = 1步</text>
         </view>
-        <view class="stats-divider-v"></view>
         <view class="stats-cell">
           <text class="stats-label">累计里程</text>
           <text class="stats-value">{{ totalKm }} <text class="stats-unit">公里</text></text>
         </view>
-        <view class="stats-divider-v"></view>
         <view class="stats-cell">
           <text class="stats-label">累计天数</text>
           <text class="stats-value">{{ syncDays }} <text class="stats-unit">天</text></text>
@@ -793,6 +789,8 @@ export default {
           this.selectedViewTeam = this.myTeam;
           this.teamMembers = [];
           this.teamTotalKm = 0;
+          // Re-link studentId in cloud every time (repairs deleted/missing records)
+          wx.cloud.callFunction({ name: 'getSteps', data: { action: 'saveTeamMember', studentId: this.myStudentId } });
           this.fetchTeamData();
         }
         return;
@@ -1441,7 +1439,7 @@ page {
 
 /* ── Stats Panel ── */
 .stats-panel {
-  background-color: #2c7c41;
+  background-color: #ffffff;
   border-radius: 28rpx 28rpx 0 0;
   flex-shrink: 0;
   position: relative;
@@ -1467,7 +1465,7 @@ page {
 
 .stats-label {
   font-size: 22rpx;
-  color: rgba(255,255,255,0.55);
+  color: #999999;
   margin-bottom: 8rpx;
   font-weight: 400;
 }
@@ -1475,12 +1473,12 @@ page {
 .stats-value {
   font-size: 32rpx;
   font-weight: 700;
-  color: #ffffff;
+  color: #222222;
 }
 
 .stats-rank {
   font-size: 26rpx;
-  color: #f5d76e;
+  color: #2c7c41;
 }
 
 .stats-small {
@@ -1490,20 +1488,7 @@ page {
 .stats-unit {
   font-size: 20rpx;
   font-weight: 400;
-  color: rgba(255,255,255,0.6);
-}
-
-.stats-divider-v {
-  width: 1rpx;
-  height: 56rpx;
-  background-color: rgba(255,255,255,0.15);
-  flex-shrink: 0;
-}
-
-.stats-divider-h {
-  height: 1rpx;
-  background-color: rgba(255,255,255,0.12);
-  margin: 0 32rpx;
+  color: #aaaaaa;
 }
 
 /* ── Bottom Nav ── */
@@ -1748,6 +1733,20 @@ page {
   margin-top: 2rpx;
   text-align: right;
 }
+
+.team-leave-btn {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5);
+  font-size: 22rpx;
+  border-radius: 30rpx;
+  border: 1rpx solid rgba(255,255,255,0.2);
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 24rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
+}
+.team-leave-btn::after { border: none; }
 
 .team-total-km-label {
   font-size: 20rpx;
