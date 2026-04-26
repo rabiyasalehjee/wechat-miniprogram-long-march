@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = '$BUILD/project.private.config.json';
 const cfg = JSON.parse(fs.readFileSync(path, 'utf8'));
 cfg.cloudfunctionRoot = 'cloudfunctions/';
-cfg.envList = [{ envId: 'cloud1-1gs1ugxif2016ac5', alias: 'cloud1' }];
+cfg.envList = [{ envId: 'cloud1-d5gm01xjv12142933', alias: 'cloud1' }];
 fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
 console.log('Done — now right-click getSteps in WeChat DevTools → Upload and Deploy');
 "

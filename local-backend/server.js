@@ -9,8 +9,8 @@ app.use(express.json());
 
 // REPLACE THESE WITH YOUR WECHAT TEST ACCOUNT CREDENTIALS
 // You get these from the WeChat Developer Sandbox (Test Account) page
-const APP_ID = "wx03c3b2cd82654864";
-const APP_SECRET = "b748e42527de23dd2e401b42c47d7cb2";
+const APP_ID = "wx818c547cafacca28";
+const APP_SECRET = "3b7041693e8d08239ab1aef5c3a84056";
 
 function decryptWeChatData(appId, sessionKey, encryptedData, iv) {
   const sessionKeyBuffer = Buffer.from(sessionKey, "base64");

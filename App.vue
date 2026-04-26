@@ -4,7 +4,7 @@
 			console.log('App Launch');
 			// Initialize WeChat Cloud — env will be resolved dynamically
 			if (wx.cloud) {
-				wx.cloud.init({ env: 'cloud1-1gs1ugxif2016ac5', traceUser: true });
+				wx.cloud.init({ env: 'cloud1-d5gm01xjv12142933', traceUser: true });
 				console.log('wx.cloud initialized');
 			}
 		},

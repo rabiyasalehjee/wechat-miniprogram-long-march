@@ -1,5 +1,35 @@
 # Long March Steps - Uni-App WeChat Mini Program
 
+---
+
+## Run Checklist (do these every time)
+
+### Step 1 — Start the local backend
+```bash
+cd local-backend
+node server.js
+```
+Keep this terminal open. Server runs on `http://localhost:3000`.
+
+### Step 2 — Copy cloud functions into dist
+```bash
+# From project root (trail-1/)
+bash deploy-cloud.sh
+```
+This makes the `cloudfunctions/` folder appear in WeChat DevTools.
+
+### Step 3 — Deploy the cloud function in WeChat DevTools
+1. In the DevTools file tree, find `cloudfunctions/getSteps`
+2. Right-click `getSteps` → **Upload and Deploy: Cloud Install Dependencies**
+3. Wait for upload to finish
+
+### Step 4 — Run the frontend
+Open in HBuilderX or WeChat DevTools and run to WeChat Mini Program.
+
+> If the cloud folder disappears in DevTools, just re-run `bash deploy-cloud.sh`.
+
+---
+
 This project, "Trail-1," is a Uni-App designed as a WeChat Mini Program to track and visualize a user's steps in the context of the "Long March" theme. It combines a Vue.js front-end with WeChat's server-side capabilities (simulated locally) to provide a themed step-tracking experience.
 
 ## Features
