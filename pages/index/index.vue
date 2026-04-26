@@ -193,6 +193,43 @@
       </view>
     </view>
 
+    <!-- Stats Panel (today tab only) -->
+    <view v-if="activeTab === 'today'" class="stats-panel">
+      <view class="stats-row">
+        <view class="stats-cell">
+          <text class="stats-label">今日步数</text>
+          <text class="stats-value">{{ todaysSteps.toLocaleString() }}</text>
+        </view>
+        <view class="stats-divider-v"></view>
+        <view class="stats-cell">
+          <text class="stats-label">今日里程</text>
+          <text class="stats-value">{{ todayKm }} <text class="stats-unit">公里</text></text>
+        </view>
+        <view class="stats-divider-v"></view>
+        <view class="stats-cell">
+          <text class="stats-label">今日排名</text>
+          <text class="stats-value stats-rank">{{ todayRank === '无' ? '暂无排名' : '第 ' + todayRank + ' 名' }}</text>
+        </view>
+      </view>
+      <view class="stats-divider-h"></view>
+      <view class="stats-row">
+        <view class="stats-cell">
+          <text class="stats-label">兑换比例</text>
+          <text class="stats-value stats-small">1步 = 1步</text>
+        </view>
+        <view class="stats-divider-v"></view>
+        <view class="stats-cell">
+          <text class="stats-label">累计里程</text>
+          <text class="stats-value">{{ totalKm }} <text class="stats-unit">公里</text></text>
+        </view>
+        <view class="stats-divider-v"></view>
+        <view class="stats-cell">
+          <text class="stats-label">累计天数</text>
+          <text class="stats-value">{{ syncDays }} <text class="stats-unit">天</text></text>
+        </view>
+      </view>
+    </view>
+
     <!-- Bottom Nav Bar -->
     <view class="bottom-nav">
       <view class="tab-item" @click="switchTab('today')">
@@ -215,7 +252,7 @@
     <view v-if="showTeamDialog" class="modal-mask">
       <view class="team-dialog-box">
         <view class="team-dialog-header">
-          <text class="team-dialog-icon">🏮</text>
+          <image class="team-dialog-icon-img" src="/static/running.png" mode="aspectFit" />
           <text class="team-dialog-title">加入团队</text>
           <text class="team-dialog-subtitle">请输入您的学工号以加入团队</text>
         </view>
@@ -296,6 +333,7 @@ export default {
       drawnSteps: 0,
       mapWidth: 0,
       mapHeight: 0,
+      syncDays: 0,
       // Teams
       showTeamDialog: false,
       teamIdInput: '',
@@ -367,6 +405,12 @@ export default {
       if (this.drawnSteps >= this.stepTarget) return 1;
       const stepsPerSegment = this.stepTarget / 12;
       return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
+    },
+    todayKm() {
+      return (this.todaysSteps / 1300).toFixed(1);
+    },
+    totalKm() {
+      return (this.totalStepsHistory / 1300).toFixed(1);
     },
     teamMembersSorted() {
       return [...this.teamMembers].sort((a, b) => b.cumulativeKm - a.cumulativeKm);
@@ -728,12 +772,15 @@ export default {
         uni.setStorageSync('todayRank', '无');
         uni.setStorageSync('stepsDate', today);
       }
+      const savedDays = uni.getStorageSync('syncDays');
+      if (savedDays) this.syncDays = parseInt(savedDays, 10);
     },
     saveData() {
       uni.setStorageSync('totalStepsHistory', this.totalStepsHistory);
       uni.setStorageSync('todaysSteps', this.todaysSteps);
       uni.setStorageSync('todayRank', this.todayRank);
       uni.setStorageSync('stepsDate', new Date().toDateString());
+      uni.setStorageSync('syncDays', this.syncDays);
     },
     switchTab(tab) {
       this.activeTab = tab;
@@ -983,8 +1030,11 @@ export default {
           uni.hideLoading();
           if (res.result && res.result.success) {
             const oldSteps = that.todaysSteps;
+            const isNewDay = that.todaysSteps === 0 && res.result.todaySteps > 0;
             that.todaysSteps = res.result.todaySteps;
+            that.totalStepsHistory = res.result.totalSteps || that.totalStepsHistory;
             if (res.result.rank) that.todayRank = res.result.rank;
+            if (isNewDay) that.syncDays += 1;
             that.saveData();
             uni.showToast({ title: '步数已更新！', icon: 'success' });
 
@@ -1089,11 +1139,11 @@ page {
 
 .sync-btn {
   background-color: #ffffff;
-  color: #76c9ad;
+  color: #2d7a4a;
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 800;
   border-radius: 40rpx;
-  border: 2rpx solid #76c9ad;
+  border: 2rpx solid #2d7a4a;
   padding: 0 28rpx;
   height: 78rpx;
   line-height: 78rpx;
@@ -1389,6 +1439,73 @@ page {
   color: rgba(255, 255, 255, 0.4);
 }
 
+/* ── Stats Panel ── */
+.stats-panel {
+  background-color: #2c7c41;
+  border-radius: 28rpx 28rpx 0 0;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  padding: 4rpx 0 0;
+}
+
+.stats-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 20rpx 0;
+}
+
+.stats-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8rpx;
+}
+
+.stats-label {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 8rpx;
+  font-weight: 400;
+}
+
+.stats-value {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.stats-rank {
+  font-size: 26rpx;
+  color: #f5d76e;
+}
+
+.stats-small {
+  font-size: 24rpx;
+}
+
+.stats-unit {
+  font-size: 20rpx;
+  font-weight: 400;
+  color: rgba(255,255,255,0.6);
+}
+
+.stats-divider-v {
+  width: 1rpx;
+  height: 56rpx;
+  background-color: rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
+.stats-divider-h {
+  height: 1rpx;
+  background-color: rgba(255,255,255,0.12);
+  margin: 0 32rpx;
+}
+
 /* ── Bottom Nav ── */
 .bottom-nav {
   background-color: #2c7c41;
@@ -1662,14 +1779,14 @@ page {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 10rpx 16rpx 10rpx 12rpx;
+  padding: 16rpx 16rpx 16rpx 12rpx;
   border-bottom: 1rpx solid rgba(255,255,255,0.12);
-  margin-bottom: 4rpx;
+  margin-bottom: 16rpx;
 }
 
 .tm-col-rank {
   width: 52rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   color: rgba(255,255,255,0.35);
   text-align: center;
   flex-shrink: 0;
@@ -1677,13 +1794,13 @@ page {
 
 .tm-col-name {
   flex: 1;
-  font-size: 22rpx;
+  font-size: 26rpx;
   color: rgba(255,255,255,0.35);
 }
 
 .tm-col-today, .tm-col-total {
   width: 100rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   color: rgba(255,255,255,0.35);
   text-align: right;
 }
@@ -1692,9 +1809,9 @@ page {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 18rpx 16rpx 18rpx 12rpx;
+  padding: 28rpx 16rpx 28rpx 12rpx;
   border-radius: 14rpx;
-  margin-bottom: 6rpx;
+  margin-bottom: 10rpx;
   background: rgba(255,255,255,0.05);
 }
 
@@ -1821,8 +1938,9 @@ page {
   margin-bottom: 36rpx;
 }
 
-.team-dialog-icon {
-  font-size: 64rpx;
+.team-dialog-icon-img {
+  width: 100rpx;
+  height: 100rpx;
   margin-bottom: 16rpx;
 }
 
