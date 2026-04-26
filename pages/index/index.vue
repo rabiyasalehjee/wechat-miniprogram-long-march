@@ -1,6 +1,6 @@
 <template>
   <view class="app">
-    <image class="bg-image" src="/static/bg-img.png" mode="aspectFill" />
+    <image v-if="activeTab !== 'teams'" class="bg-image" src="/static/bg-img.png" mode="aspectFill" />
 
     <!-- Top Nav Bar (hidden on teams tab) -->
     <view v-if="activeTab !== 'teams'" class="top-nav">
@@ -107,40 +107,42 @@
 
       <!-- Team Selector (top nav style) -->
       <view class="team-selector-bar">
-        <view
-          v-for="t in ['Team1','Team2','Team3','Team4']"
-          :key="t"
-          class="team-selector-item"
-          @click="selectViewTeam(t)"
-        >
-          <view class="team-selector-dot" :style="{ backgroundColor: (teamColors[t] || {}).primary }"></view>
-          <text class="team-selector-text" :style="{ color: selectedViewTeam === t ? '#ffffff' : 'rgba(255,255,255,0.5)' }">{{ t }}</text>
-          <view class="team-selector-line" v-if="selectedViewTeam === t" :style="{ backgroundColor: (teamColors[t] || {}).primary }"></view>
+        <view class="team-selector-item" @click="selectViewTeam('Team1')">
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team1' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第一队</text>
+          <view class="active-line" v-if="selectedViewTeam === 'Team1'"></view>
+        </view>
+        <view class="tab-divider"></view>
+        <view class="team-selector-item" @click="selectViewTeam('Team2')">
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team2' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第二队</text>
+          <view class="active-line" v-if="selectedViewTeam === 'Team2'"></view>
+        </view>
+        <view class="tab-divider"></view>
+        <view class="team-selector-item" @click="selectViewTeam('Team3')">
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team3' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第三队</text>
+          <view class="active-line" v-if="selectedViewTeam === 'Team3'"></view>
+        </view>
+        <view class="tab-divider"></view>
+        <view class="team-selector-item" @click="selectViewTeam('Team4')">
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team4' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第四队</text>
+          <view class="active-line" v-if="selectedViewTeam === 'Team4'"></view>
         </view>
       </view>
 
       <!-- Team Content -->
       <view class="team-content">
 
-        <!-- Team Header Card -->
-        <view class="team-header-card" :style="{ borderColor: (teamColors[selectedViewTeam] || {}).primary }">
-          <view class="team-header-left">
-            <view class="team-color-dot" :style="{ backgroundColor: (teamColors[selectedViewTeam] || {}).primary }"></view>
-            <view>
-              <text class="team-header-name">{{ (teamColors[selectedViewTeam] || {}).name || selectedViewTeam }}</text>
-              <text class="team-header-sub" v-if="myTeam === selectedViewTeam">我的团队 · {{ myStudentId }}</text>
-              <text class="team-header-sub" v-else>查看模式</text>
-            </view>
+        <!-- Team Header Banner -->
+        <view class="team-header-banner">
+          <view class="team-header-info">
+            <text class="team-header-name">{{ teamChineseName[selectedViewTeam] || selectedViewTeam }}</text>
+            <text class="team-header-sub" v-if="myTeam === selectedViewTeam">我的团队 · {{ myStudentId }}</text>
+            <text class="team-header-sub" v-else>活动周期：2026.05.04 — 2026.10.22</text>
           </view>
-          <view class="team-header-right">
+          <view class="team-header-stat">
             <text class="team-total-km">{{ teamTotalKm }}</text>
-            <text class="team-total-km-unit">km 总里程</text>
+            <text class="team-total-km-unit">公里</text>
+            <text class="team-total-km-label">团队总里程</text>
           </view>
-        </view>
-
-        <!-- Activity Period -->
-        <view class="team-period-bar">
-          <text class="team-period-text">🗓 活动周期：2026.05.04 — 2026.10.22</text>
         </view>
 
         <!-- Loading -->
@@ -151,30 +153,41 @@
         <!-- Member List -->
         <scroll-view v-else scroll-y class="team-member-list">
           <view class="team-member-list-header">
+            <text class="tm-col-rank">#</text>
             <text class="tm-col-name">成员</text>
-            <text class="tm-col-today">今日(km)</text>
-            <text class="tm-col-total">累计(km)</text>
+            <text class="tm-col-today">今日</text>
+            <text class="tm-col-total">累计</text>
           </view>
+
           <view
             v-for="(m, i) in teamMembersSorted"
             :key="m.studentId"
             class="team-member-row"
-            :style="{ borderLeftColor: (teamColors[selectedViewTeam] || {}).primary, backgroundColor: m.studentId === myStudentId ? (teamColors[selectedViewTeam] || {}).light : 'transparent' }"
+            :class="{ 'team-member-mine': m.studentId === myStudentId }"
           >
-            <text class="tm-rank">{{ i + 1 }}</text>
+            <text class="tm-rank" :class="{ 'tm-rank-gold': i === 0, 'tm-rank-silver': i === 1, 'tm-rank-bronze': i === 2 }">{{ i + 1 }}</text>
             <view class="tm-info">
               <text class="tm-name">{{ m.nickname }}</text>
               <text class="tm-id">{{ m.studentId }}</text>
             </view>
-            <text class="tm-today" :style="{ color: (teamColors[selectedViewTeam] || {}).primary }">{{ m.todayKm }}</text>
-            <text class="tm-cumulative">{{ m.cumulativeKm }}</text>
+            <view class="tm-today-wrap">
+              <text class="tm-today">{{ m.todayKm }}</text>
+              <text class="tm-unit">公里</text>
+            </view>
+            <view class="tm-cumulative-wrap">
+              <text class="tm-cumulative">{{ m.cumulativeKm }}</text>
+              <text class="tm-unit">公里</text>
+            </view>
           </view>
+
           <view v-if="!teamLoading && teamMembers.length === 0" class="team-empty">
-            <text class="team-empty-text">暂无成员数据，请先同步步数</text>
+            <text class="team-empty-text">暂无成员数据</text>
+            <text class="team-empty-hint">请先在主页同步微信步数</text>
           </view>
+
           <view v-if="teamMembers.length > 0" class="team-total-row">
             <text class="team-total-label">团队总计</text>
-            <text class="team-total-value" :style="{ color: (teamColors[selectedViewTeam] || {}).primary }">{{ teamTotalKm }} km</text>
+            <text class="team-total-value">{{ teamTotalKm }} 公里</text>
           </view>
         </scroll-view>
       </view>
@@ -293,19 +306,20 @@ export default {
       teamMembers: [],
       teamTotalKm: 0,
       teamLoading: false,
+      teamChineseName: {
+        'Team1': '第一队', 'Team2': '第二队', 'Team3': '第三队', 'Team4': '第四队'
+      },
       teamColors: {
         'Team1': { primary: '#c0392b', light: 'rgba(192,57,43,0.15)', name: '红队' },
         'Team2': { primary: '#2980b9', light: 'rgba(41,128,185,0.15)', name: '蓝队' },
         'Team3': { primary: '#d35400', light: 'rgba(211,84,0,0.15)',   name: '橙队' },
-        'Team4': { primary: '#8e44ad', light: 'rgba(142,68,173,0.15)', name: '紫队' },
-        'Team5': { primary: '#16a085', light: 'rgba(22,160,133,0.15)', name: '青队' }
+        'Team4': { primary: '#8e44ad', light: 'rgba(142,68,173,0.15)', name: '紫队' }
       },
       teamData: {
         'Team1': ['21B908040','23B308006','23B908051','24B908021','25B308027','21B908014','22B908026','23B908033','25B908031','25B308018','22B908036'],
         'Team2': ['20B908016','20B908054','21B908043','22B908022','23B308002','23B908038','23B908056','24B308009','24B908037','24B908045','25B308017','20B908061','22B308004','24B908040','25B308008','24B308016','22B908019','18B908028','18B908088','19B908065','21B908039'],
         'Team3': ['18B908105','20B908060','22B908035','22B908040','23B908031','24B908032','24B908041','23B908035','23B908061','25B308023','22B908037'],
         'Team4': ['19B908045','20B908059','20B908029','21B908038','21B908042','22B308007','22B908023','22B908044','23B908024','24B308008','26B308020','19B908063','19B908064','20B908022','22B908038','23B908022','24B908031','25B908046','26B308012','25B308022','25B908030','18B908014','19B908036','19B908046','20B908017','17B908042'],
-        'Team5': ['12345','112233']
       },
       // Map check points (1 to 13 based on the Long March route)
       checkpoints: [
@@ -378,7 +392,16 @@ export default {
     // Load team assignment
     const savedTeam = uni.getStorageSync('myTeam');
     const savedId = uni.getStorageSync('myStudentId');
-    if (savedTeam) { this.myTeam = savedTeam; this.myStudentId = savedId; this.selectedViewTeam = savedTeam; }
+    const validTeams = ['Team1', 'Team2', 'Team3', 'Team4'];
+    if (savedTeam && validTeams.includes(savedTeam)) {
+      this.myTeam = savedTeam;
+      this.myStudentId = savedId;
+      this.selectedViewTeam = savedTeam;
+    } else if (savedTeam) {
+      // Clear stale/invalid team from local storage
+      uni.removeStorageSync('myTeam');
+      uni.removeStorageSync('myStudentId');
+    }
     const cached = uni.getStorageSync('userProfile');
     if (cached && cached.nickname) {
       this.userNickname = cached.nickname;
@@ -721,6 +744,8 @@ export default {
           this.showTeamDialog = true;
         } else {
           this.selectedViewTeam = this.myTeam;
+          this.teamMembers = [];
+          this.teamTotalKm = 0;
           this.fetchTeamData();
         }
         return;
@@ -903,14 +928,19 @@ export default {
     },
     selectViewTeam(team) {
       this.selectedViewTeam = team;
+      this.teamMembers = [];
+      this.teamTotalKm = 0;
       this.fetchTeamData();
     },
     fetchTeamData() {
       this.teamLoading = true;
+      const teamName = this.selectedViewTeam;
       wx.cloud.callFunction({
         name: 'getSteps',
-        data: { action: 'getTeamData', teamName: this.selectedViewTeam },
+        data: { action: 'getTeamData', teamName },
         success: (res) => {
+          // Discard result if user already switched to another team
+          if (this.selectedViewTeam !== teamName) return;
           if (res.result && res.result.success) {
             this.teamMembers = res.result.members || [];
             this.teamTotalKm = res.result.totalKm || 0;
@@ -1416,25 +1446,26 @@ page {
 }
 
 .modal-box {
-  background-color: #ffffff;
-  border-radius: 24rpx;
+  background: linear-gradient(160deg, #1e5c35, #2d6040);
+  border-radius: 28rpx;
   padding: 48rpx 40rpx;
   width: 600rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.4);
 }
 
 .modal-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: #2d6040;
+  color: #f5d76e;
   margin-bottom: 12rpx;
 }
 
 .modal-hint {
   font-size: 24rpx;
-  color: #888;
+  color: rgba(255,255,255,0.6);
   margin-bottom: 40rpx;
 }
 
@@ -1455,23 +1486,25 @@ page {
   width: 120rpx;
   height: 120rpx;
   border-radius: 60rpx;
-  background-color: #e0e0e0;
+  background-color: rgba(255,255,255,0.15);
   margin-bottom: 12rpx;
+  border: 2rpx solid rgba(255,255,255,0.3);
 }
 
 .avatar-picker-label {
   font-size: 24rpx;
-  color: #2d6040;
+  color: rgba(255,255,255,0.7);
 }
 
 .nickname-input {
   width: 100%;
-  height: 80rpx;
-  border: 2rpx solid #d0d0d0;
-  border-radius: 12rpx;
+  height: 84rpx;
+  border: 2rpx solid rgba(255,255,255,0.25);
+  border-radius: 14rpx;
   padding: 0 24rpx;
   font-size: 28rpx;
-  color: #333;
+  color: #ffffff;
+  background-color: rgba(255,255,255,0.1);
   margin-bottom: 32rpx;
   box-sizing: border-box;
 }
@@ -1479,10 +1512,10 @@ page {
 .modal-confirm-btn {
   width: 100%;
   height: 88rpx;
-  background-color: #2d6040;
-  color: #ffffff;
+  background: linear-gradient(135deg, #f5d76e, #e8b94a);
+  color: #1a3a20;
   font-size: 30rpx;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 44rpx;
   line-height: 88rpx;
   margin-bottom: 16rpx;
@@ -1495,7 +1528,7 @@ page {
   width: 100%;
   height: 80rpx;
   background: none;
-  color: #888;
+  color: rgba(255,255,255,0.4);
   font-size: 26rpx;
   line-height: 80rpx;
 }
@@ -1517,9 +1550,9 @@ page {
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 88rpx;
+  height: 100rpx;
   flex-shrink: 0;
-  padding: 0 8rpx;
+  padding-bottom: 0;
 }
 
 .team-selector-item {
@@ -1530,26 +1563,11 @@ page {
   justify-content: center;
   height: 100%;
   position: relative;
-  gap: 6rpx;
-}
-
-.team-selector-dot {
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
 }
 
 .team-selector-text {
-  font-size: 26rpx;
+  font-size: 30rpx;
   font-weight: 500;
-}
-
-.team-selector-line {
-  position: absolute;
-  bottom: 10rpx;
-  width: 36rpx;
-  height: 5rpx;
-  border-radius: 3rpx;
 }
 
 .team-content {
@@ -1557,83 +1575,71 @@ page {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 24rpx 28rpx 0;
+  padding: 28rpx 28rpx 0;
   box-sizing: border-box;
 }
 
-.team-header-card {
-  background: rgba(255,255,255,0.1);
-  border: 3rpx solid;
-  border-radius: 24rpx;
-  padding: 28rpx 32rpx;
+/* Header Banner */
+.team-header-banner {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16rpx;
+  background: rgba(255,255,255,0.08);
+  border-radius: 20rpx;
+  padding: 28rpx 32rpx;
+  margin-bottom: 20rpx;
   flex-shrink: 0;
+  border-bottom: 2rpx solid rgba(245,215,110,0.25);
 }
 
-.team-header-left {
+.team-header-info {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 20rpx;
-}
-
-.team-color-dot {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  flex-shrink: 0;
+  flex-direction: column;
 }
 
 .team-header-name {
-  font-size: 34rpx;
+  font-size: 38rpx;
   font-weight: 700;
   color: #ffffff;
-  display: block;
+  letter-spacing: 2rpx;
 }
 
 .team-header-sub {
   font-size: 22rpx;
   color: rgba(255,255,255,0.5);
-  display: block;
-  margin-top: 4rpx;
+  margin-top: 8rpx;
 }
 
-.team-header-right {
+.team-header-stat {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
 }
 
 .team-total-km {
-  font-size: 48rpx;
+  font-size: 52rpx;
   font-weight: 700;
   color: #f5d76e;
   line-height: 1;
 }
 
 .team-total-km-unit {
-  font-size: 20rpx;
-  color: rgba(255,255,255,0.55);
-  margin-top: 4rpx;
-}
-
-.team-period-bar {
-  background: rgba(255,255,255,0.06);
-  border-radius: 12rpx;
-  padding: 12rpx 20rpx;
-  margin-bottom: 16rpx;
-  flex-shrink: 0;
-}
-
-.team-period-text {
   font-size: 22rpx;
-  color: rgba(255,255,255,0.6);
+  color: #f5d76e;
+  font-weight: 600;
+  margin-top: 2rpx;
+  text-align: right;
 }
 
+.team-total-km-label {
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.45);
+  margin-top: 4rpx;
+  text-align: right;
+}
+
+/* Loading */
 .team-loading-wrap {
   flex: 1;
   display: flex;
@@ -1646,29 +1652,39 @@ page {
   color: rgba(255,255,255,0.4);
 }
 
+/* Member List */
 .team-member-list {
   flex: 1;
-  height: 1rpx; /* trick for scroll-view to fill space */
+  height: 1rpx;
 }
 
 .team-member-list-header {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 12rpx 20rpx 12rpx 60rpx;
-  border-bottom: 1rpx solid rgba(255,255,255,0.1);
+  padding: 10rpx 16rpx 10rpx 12rpx;
+  border-bottom: 1rpx solid rgba(255,255,255,0.12);
+  margin-bottom: 4rpx;
+}
+
+.tm-col-rank {
+  width: 52rpx;
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .tm-col-name {
   flex: 1;
   font-size: 22rpx;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.35);
 }
 
 .tm-col-today, .tm-col-total {
-  width: 110rpx;
+  width: 100rpx;
   font-size: 22rpx;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.35);
   text-align: right;
 }
 
@@ -1676,21 +1692,29 @@ page {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 20rpx 20rpx 20rpx 0;
-  border-left: 6rpx solid;
-  border-bottom: 1rpx solid rgba(255,255,255,0.06);
-  padding-left: 16rpx;
-  border-radius: 0 12rpx 12rpx 0;
-  margin-bottom: 4rpx;
+  padding: 18rpx 16rpx 18rpx 12rpx;
+  border-radius: 14rpx;
+  margin-bottom: 6rpx;
+  background: rgba(255,255,255,0.05);
+}
+
+.team-member-mine {
+  background: rgba(245,215,110,0.12);
+  border: 1rpx solid rgba(245,215,110,0.3);
 }
 
 .tm-rank {
-  width: 44rpx;
-  font-size: 24rpx;
-  color: rgba(255,255,255,0.35);
+  width: 52rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: rgba(255,255,255,0.3);
   text-align: center;
   flex-shrink: 0;
 }
+
+.tm-rank-gold   { color: #f5d76e; }
+.tm-rank-silver { color: #c0c0c0; }
+.tm-rank-bronze { color: #cd7f32; }
 
 .tm-info {
   flex: 1;
@@ -1706,36 +1730,52 @@ page {
 
 .tm-id {
   font-size: 20rpx;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.35);
   margin-top: 4rpx;
 }
 
+.tm-today-wrap, .tm-cumulative-wrap {
+  width: 100rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
 .tm-today {
-  width: 110rpx;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 600;
-  text-align: right;
+  color: rgba(255,255,255,0.75);
 }
 
 .tm-cumulative {
-  width: 110rpx;
-  font-size: 28rpx;
+  font-size: 26rpx;
   color: #f5d76e;
   font-weight: 700;
-  text-align: right;
+}
+
+.tm-unit {
+  font-size: 18rpx;
+  color: rgba(255,255,255,0.3);
+  margin-top: 2rpx;
 }
 
 .team-empty {
-  padding: 60rpx 0;
+  padding: 80rpx 0 40rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16rpx;
 }
 
 .team-empty-text {
-  font-size: 26rpx;
-  color: rgba(255,255,255,0.3);
-  text-align: center;
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.5);
+}
+
+.team-empty-hint {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.25);
 }
 
 .team-total-row {
@@ -1743,45 +1783,42 @@ page {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx 20rpx;
-  border-top: 2rpx solid rgba(255,255,255,0.15);
+  padding: 22rpx 16rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.12);
   margin-top: 8rpx;
 }
 
 .team-total-label {
-  font-size: 28rpx;
-  color: rgba(255,255,255,0.7);
-  font-weight: 600;
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.6);
+  font-weight: 500;
 }
 
 .team-total-value {
-  font-size: 36rpx;
+  font-size: 34rpx;
   font-weight: 700;
+  color: #f5d76e;
 }
 
 
 /* ── Team Dialog ── */
 .team-dialog-box {
-  background: #ffffff;
+  background: linear-gradient(160deg, #1e5c35, #2d6040);
   border-radius: 32rpx;
-  padding: 0 0 40rpx;
+  padding: 48rpx 40rpx 40rpx;
   width: 620rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  overflow: hidden;
-  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.3);
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.4);
 }
 
 .team-dialog-header {
-  background: linear-gradient(135deg, #2c7c41, #1a4a2e);
   width: 100%;
-  padding: 48rpx 40rpx 40rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-sizing: border-box;
-  margin-bottom: 40rpx;
+  margin-bottom: 36rpx;
 }
 
 .team-dialog-icon {
@@ -1798,13 +1835,12 @@ page {
 
 .team-dialog-subtitle {
   font-size: 24rpx;
-  color: rgba(255,255,255,0.75);
+  color: rgba(255,255,255,0.65);
   text-align: center;
 }
 
 .team-input-wrap {
   width: 100%;
-  padding: 0 40rpx;
   box-sizing: border-box;
   margin-bottom: 16rpx;
 }
@@ -1812,52 +1848,51 @@ page {
 .team-input {
   width: 100%;
   height: 88rpx;
-  border: 2rpx solid #d8d8d8;
+  border: 2rpx solid rgba(255,255,255,0.25);
   border-radius: 16rpx;
   padding: 0 28rpx;
   font-size: 30rpx;
-  color: #333;
-  background-color: #f9f9f9;
+  color: #ffffff;
+  background-color: rgba(255,255,255,0.1);
   box-sizing: border-box;
 }
 
 .team-input-placeholder {
-  color: #bbb;
+  color: rgba(255,255,255,0.35);
   font-size: 28rpx;
 }
 
 .team-error-msg {
   width: 100%;
-  padding: 0 40rpx;
   box-sizing: border-box;
   margin-bottom: 8rpx;
 }
 
 .team-error-text {
   font-size: 22rpx;
-  color: #c0392b;
+  color: #f5d76e;
 }
 
 .team-enter-btn {
-  width: calc(100% - 80rpx);
+  width: 100%;
   height: 92rpx;
-  background: linear-gradient(135deg, #2c7c41, #1a5a30);
-  color: #ffffff;
+  background: linear-gradient(135deg, #f5d76e, #e8b94a);
+  color: #1a3a20;
   font-size: 32rpx;
   font-weight: 700;
   border-radius: 46rpx;
   line-height: 92rpx;
   margin-top: 24rpx;
   margin-bottom: 0;
-  box-shadow: 0 8rpx 24rpx rgba(44,124,65,0.35);
+  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.2);
 }
 .team-enter-btn::after { border: none; }
 
 .team-cancel-btn {
-  width: calc(100% - 80rpx);
+  width: 100%;
   height: 76rpx;
   background: none;
-  color: #aaa;
+  color: rgba(255,255,255,0.4);
   font-size: 26rpx;
   line-height: 76rpx;
   margin-top: 8rpx;
