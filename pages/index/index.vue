@@ -2,8 +2,8 @@
   <view class="app">
     <image class="bg-image" src="/static/bg-img.png" mode="aspectFill" />
 
-    <!-- Top Nav Bar -->
-    <view class="top-nav">
+    <!-- Top Nav Bar (hidden on teams tab) -->
+    <view v-if="activeTab !== 'teams'" class="top-nav">
       <view class="nav-left">
         <view class="nav-row-1">
           <text class="nav-yellow">今日步数：{{ todaysSteps }}</text>
@@ -90,6 +90,7 @@
               class="avatar"
               :src="item.avatarUrl || '/static/default-avatar.png'"
               mode="aspectFill"
+              @error="item.avatarUrl = '/static/default-avatar.png'"
             />
           </view>
           <text class="leader-name">{{ item.nickname || '微信用户' }}</text>
@@ -99,6 +100,84 @@
           <text class="placeholder-text">暂无数据</text>
         </view>
       </scroll-view>
+    </view>
+
+    <!-- Tab 3: 团队 -->
+    <view v-if="activeTab === 'teams'" class="tab3-wrapper">
+
+      <!-- Team Selector (top nav style) -->
+      <view class="team-selector-bar">
+        <view
+          v-for="t in ['Team1','Team2','Team3','Team4']"
+          :key="t"
+          class="team-selector-item"
+          @click="selectViewTeam(t)"
+        >
+          <view class="team-selector-dot" :style="{ backgroundColor: (teamColors[t] || {}).primary }"></view>
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === t ? '#ffffff' : 'rgba(255,255,255,0.5)' }">{{ t }}</text>
+          <view class="team-selector-line" v-if="selectedViewTeam === t" :style="{ backgroundColor: (teamColors[t] || {}).primary }"></view>
+        </view>
+      </view>
+
+      <!-- Team Content -->
+      <view class="team-content">
+
+        <!-- Team Header Card -->
+        <view class="team-header-card" :style="{ borderColor: (teamColors[selectedViewTeam] || {}).primary }">
+          <view class="team-header-left">
+            <view class="team-color-dot" :style="{ backgroundColor: (teamColors[selectedViewTeam] || {}).primary }"></view>
+            <view>
+              <text class="team-header-name">{{ (teamColors[selectedViewTeam] || {}).name || selectedViewTeam }}</text>
+              <text class="team-header-sub" v-if="myTeam === selectedViewTeam">我的团队 · {{ myStudentId }}</text>
+              <text class="team-header-sub" v-else>查看模式</text>
+            </view>
+          </view>
+          <view class="team-header-right">
+            <text class="team-total-km">{{ teamTotalKm }}</text>
+            <text class="team-total-km-unit">km 总里程</text>
+          </view>
+        </view>
+
+        <!-- Activity Period -->
+        <view class="team-period-bar">
+          <text class="team-period-text">🗓 活动周期：2026.05.04 — 2026.10.22</text>
+        </view>
+
+        <!-- Loading -->
+        <view v-if="teamLoading" class="team-loading-wrap">
+          <text class="team-loading-text">加载中...</text>
+        </view>
+
+        <!-- Member List -->
+        <scroll-view v-else scroll-y class="team-member-list">
+          <view class="team-member-list-header">
+            <text class="tm-col-name">成员</text>
+            <text class="tm-col-today">今日(km)</text>
+            <text class="tm-col-total">累计(km)</text>
+          </view>
+          <view
+            v-for="(m, i) in teamMembersSorted"
+            :key="m.studentId"
+            class="team-member-row"
+            :style="{ borderLeftColor: (teamColors[selectedViewTeam] || {}).primary, backgroundColor: m.studentId === myStudentId ? (teamColors[selectedViewTeam] || {}).light : 'transparent' }"
+          >
+            <text class="tm-rank">{{ i + 1 }}</text>
+            <view class="tm-info">
+              <text class="tm-name">{{ m.nickname }}</text>
+              <text class="tm-id">{{ m.studentId }}</text>
+            </view>
+            <text class="tm-today" :style="{ color: (teamColors[selectedViewTeam] || {}).primary }">{{ m.todayKm }}</text>
+            <text class="tm-cumulative">{{ m.cumulativeKm }}</text>
+          </view>
+          <view v-if="!teamLoading && teamMembers.length === 0" class="team-empty">
+            <text class="team-empty-text">暂无成员数据，请先同步步数</text>
+          </view>
+          <view v-if="teamMembers.length > 0" class="team-total-row">
+            <text class="team-total-label">团队总计</text>
+            <text class="team-total-value" :style="{ color: (teamColors[selectedViewTeam] || {}).primary }">{{ teamTotalKm }} km</text>
+          </view>
+        </scroll-view>
+      </view>
     </view>
 
     <!-- Bottom Nav Bar -->
@@ -111,6 +190,38 @@
       <view class="tab-item" @click="switchTab('period')">
         <text class="tab-text">本期榜单</text>
         <view class="active-line" v-if="activeTab === 'period'"></view>
+      </view>
+      <view class="tab-divider"></view>
+      <view class="tab-item" @click="switchTab('teams')">
+        <text class="tab-text">团队</text>
+        <view class="active-line" v-if="activeTab === 'teams'"></view>
+      </view>
+    </view>
+
+    <!-- Team ID Dialog -->
+    <view v-if="showTeamDialog" class="modal-mask">
+      <view class="team-dialog-box">
+        <view class="team-dialog-header">
+          <text class="team-dialog-icon">🏮</text>
+          <text class="team-dialog-title">加入团队</text>
+          <text class="team-dialog-subtitle">请输入您的学工号以加入团队</text>
+        </view>
+        <view class="team-input-wrap">
+          <input
+            class="team-input"
+            type="text"
+            placeholder="请输入学工号"
+            placeholder-class="team-input-placeholder"
+            :value="teamIdInput"
+            @input="onTeamIdInput"
+            @confirm="submitTeamId"
+          />
+        </view>
+        <view v-if="teamErrorMsg" class="team-error-msg">
+          <text class="team-error-text">{{ teamErrorMsg }}</text>
+        </view>
+        <button class="team-enter-btn" @click="submitTeamId">确认加入</button>
+        <button class="team-cancel-btn" @click="cancelTeamDialog">暂不加入</button>
       </view>
     </view>
 
@@ -158,7 +269,7 @@ export default {
       todayRank: '无',
       userPosition: null,
       activeTab: 'today',
-      endDate: new Date('2026-05-29T23:59:59'),
+      endDate: new Date('2026-10-22T23:59:59'),
       leaderboard: [],
       leaderboardLoading: false,
       userNickname: '',
@@ -172,6 +283,30 @@ export default {
       drawnSteps: 0,
       mapWidth: 0,
       mapHeight: 0,
+      // Teams
+      showTeamDialog: false,
+      teamIdInput: '',
+      teamErrorMsg: '',
+      myTeam: '',
+      myStudentId: '',
+      selectedViewTeam: 'Team1',
+      teamMembers: [],
+      teamTotalKm: 0,
+      teamLoading: false,
+      teamColors: {
+        'Team1': { primary: '#c0392b', light: 'rgba(192,57,43,0.15)', name: '红队' },
+        'Team2': { primary: '#2980b9', light: 'rgba(41,128,185,0.15)', name: '蓝队' },
+        'Team3': { primary: '#d35400', light: 'rgba(211,84,0,0.15)',   name: '橙队' },
+        'Team4': { primary: '#8e44ad', light: 'rgba(142,68,173,0.15)', name: '紫队' },
+        'Team5': { primary: '#16a085', light: 'rgba(22,160,133,0.15)', name: '青队' }
+      },
+      teamData: {
+        'Team1': ['21B908040','23B308006','23B908051','24B908021','25B308027','21B908014','22B908026','23B908033','25B908031','25B308018','22B908036'],
+        'Team2': ['20B908016','20B908054','21B908043','22B908022','23B308002','23B908038','23B908056','24B308009','24B908037','24B908045','25B308017','20B908061','22B308004','24B908040','25B308008','24B308016','22B908019','18B908028','18B908088','19B908065','21B908039'],
+        'Team3': ['18B908105','20B908060','22B908035','22B908040','23B908031','24B908032','24B908041','23B908035','23B908061','25B308023','22B908037'],
+        'Team4': ['19B908045','20B908059','20B908029','21B908038','21B908042','22B308007','22B908023','22B908044','23B908024','24B308008','26B308020','19B908063','19B908064','20B908022','22B908038','23B908022','24B908031','25B908046','26B308012','25B308022','25B908030','18B908014','19B908036','19B908046','20B908017','17B908042'],
+        'Team5': ['12345','112233']
+      },
       // Map check points (1 to 13 based on the Long March route)
       checkpoints: [
         { x: 88, y: 79, label: '瑞金', pos: 'right', style: 'margin-left: 36rpx;' }, // 1. Extra gap
@@ -219,6 +354,9 @@ export default {
       const stepsPerSegment = this.stepTarget / 12;
       return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
     },
+    teamMembersSorted() {
+      return [...this.teamMembers].sort((a, b) => b.cumulativeKm - a.cumulativeKm);
+    },
     userMarkerTextPos() {
       if (!this.userPosition) return 'top';
       const ux = this.userPosition.x;
@@ -237,6 +375,10 @@ export default {
   },
   mounted() {
     this.loadLocalData();
+    // Load team assignment
+    const savedTeam = uni.getStorageSync('myTeam');
+    const savedId = uni.getStorageSync('myStudentId');
+    if (savedTeam) { this.myTeam = savedTeam; this.myStudentId = savedId; this.selectedViewTeam = savedTeam; }
     const cached = uni.getStorageSync('userProfile');
     if (cached && cached.nickname) {
       this.userNickname = cached.nickname;
@@ -548,17 +690,41 @@ export default {
       if (savedSteps) {
         this.totalStepsHistory = parseInt(savedSteps, 10);
       }
-      const savedToday = uni.getStorageSync('todaysSteps');
-      if (savedToday) {
-        this.todaysSteps = parseInt(savedToday, 10);
+      const today = new Date().toDateString();
+      const savedDate = uni.getStorageSync('stepsDate');
+      if (savedDate === today) {
+        const savedToday = uni.getStorageSync('todaysSteps');
+        if (savedToday) this.todaysSteps = parseInt(savedToday, 10);
+        const savedRank = uni.getStorageSync('todayRank');
+        if (savedRank) this.todayRank = savedRank;
+      } else {
+        // New day — reset daily stats
+        this.todaysSteps = 0;
+        this.todayRank = '无';
+        uni.setStorageSync('todaysSteps', 0);
+        uni.setStorageSync('todayRank', '无');
+        uni.setStorageSync('stepsDate', today);
       }
     },
     saveData() {
       uni.setStorageSync('totalStepsHistory', this.totalStepsHistory);
       uni.setStorageSync('todaysSteps', this.todaysSteps);
+      uni.setStorageSync('todayRank', this.todayRank);
+      uni.setStorageSync('stepsDate', new Date().toDateString());
     },
     switchTab(tab) {
       this.activeTab = tab;
+      if (tab === 'teams') {
+        if (!this.myTeam) {
+          this.teamIdInput = '';
+          this.teamErrorMsg = '';
+          this.showTeamDialog = true;
+        } else {
+          this.selectedViewTeam = this.myTeam;
+          this.fetchTeamData();
+        }
+        return;
+      }
       if (tab === 'period') {
         this.fetchLeaderboard();
       } else if (tab === 'today') {
@@ -709,12 +875,80 @@ export default {
     doSync(nickname, avatarUrl) {
       this.sendToServer(this.pendingSyncCode, this.pendingSyncEncryptedData, this.pendingSyncIv, nickname, avatarUrl);
     },
+    onTeamIdInput(e) {
+      this.teamIdInput = e.detail.value;
+      this.teamErrorMsg = '';
+    },
+    submitTeamId() {
+      const id = this.teamIdInput.trim();
+      if (!id) { this.teamErrorMsg = '请输入学工号'; return; }
+      let foundTeam = '';
+      for (const [team, ids] of Object.entries(this.teamData)) {
+        if (ids.includes(id)) { foundTeam = team; break; }
+      }
+      if (!foundTeam) {
+        this.teamErrorMsg = '未找到该学工号，请确认后重新输入';
+        return;
+      }
+      this.myTeam = foundTeam;
+      this.myStudentId = id;
+      this.selectedViewTeam = foundTeam;
+      uni.setStorageSync('myTeam', foundTeam);
+      uni.setStorageSync('myStudentId', id);
+      this.showTeamDialog = false;
+      uni.showToast({ title: '成功加入 ' + foundTeam + '！', icon: 'success' });
+      // Link studentId to cloud record
+      wx.cloud.callFunction({ name: 'getSteps', data: { action: 'saveTeamMember', studentId: id } });
+      this.fetchTeamData();
+    },
+    selectViewTeam(team) {
+      this.selectedViewTeam = team;
+      this.fetchTeamData();
+    },
+    fetchTeamData() {
+      this.teamLoading = true;
+      wx.cloud.callFunction({
+        name: 'getSteps',
+        data: { action: 'getTeamData', teamName: this.selectedViewTeam },
+        success: (res) => {
+          if (res.result && res.result.success) {
+            this.teamMembers = res.result.members || [];
+            this.teamTotalKm = res.result.totalKm || 0;
+          }
+          this.teamLoading = false;
+        },
+        fail: () => { this.teamLoading = false; }
+      });
+    },
+    cancelTeamDialog() {
+      this.showTeamDialog = false;
+      if (!this.myTeam) this.activeTab = 'today';
+    },
+    leaveTeam() {
+      uni.showModal({
+        title: '退出团队',
+        content: '确定要退出当前团队吗？',
+        confirmText: '退出',
+        confirmColor: '#c0392b',
+        success: (res) => {
+          if (res.confirm) {
+            this.myTeam = '';
+            this.myStudentId = '';
+            uni.removeStorageSync('myTeam');
+            uni.removeStorageSync('myStudentId');
+            this.teamIdInput = '';
+            this.teamErrorMsg = '';
+            this.showTeamDialog = true;
+          }
+        }
+      });
+    },
     sendToServer(code, encryptedData, iv, nickname, avatarUrl) {
       const that = this;
       uni.showLoading({ title: '读取中...' });
       wx.cloud.callFunction({
         name: 'getSteps',
-        data: { action: 'syncSteps', code, encryptedData, iv, nickname, avatarUrl },
+        data: { action: 'syncSteps', code, encryptedData, iv, nickname, avatarUrl, studentId: that.myStudentId || '' },
         success: (res) => {
           uni.hideLoading();
           if (res.result && res.result.success) {
@@ -1268,4 +1502,365 @@ page {
 .modal-cancel-btn::after {
   border: none;
 }
+
+/* ── Tab 3: Teams ── */
+.tab3-wrapper {
+  flex: 1;
+  background-color: #2d6040;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.team-selector-bar {
+  background-color: #2c7c41;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 88rpx;
+  flex-shrink: 0;
+  padding: 0 8rpx;
+}
+
+.team-selector-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  position: relative;
+  gap: 6rpx;
+}
+
+.team-selector-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+}
+
+.team-selector-text {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.team-selector-line {
+  position: absolute;
+  bottom: 10rpx;
+  width: 36rpx;
+  height: 5rpx;
+  border-radius: 3rpx;
+}
+
+.team-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 24rpx 28rpx 0;
+  box-sizing: border-box;
+}
+
+.team-header-card {
+  background: rgba(255,255,255,0.1);
+  border: 3rpx solid;
+  border-radius: 24rpx;
+  padding: 28rpx 32rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+  flex-shrink: 0;
+}
+
+.team-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.team-color-dot {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-header-name {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #ffffff;
+  display: block;
+}
+
+.team-header-sub {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.5);
+  display: block;
+  margin-top: 4rpx;
+}
+
+.team-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.team-total-km {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #f5d76e;
+  line-height: 1;
+}
+
+.team-total-km-unit {
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.55);
+  margin-top: 4rpx;
+}
+
+.team-period-bar {
+  background: rgba(255,255,255,0.06);
+  border-radius: 12rpx;
+  padding: 12rpx 20rpx;
+  margin-bottom: 16rpx;
+  flex-shrink: 0;
+}
+
+.team-period-text {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.6);
+}
+
+.team-loading-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-loading-text {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.4);
+}
+
+.team-member-list {
+  flex: 1;
+  height: 1rpx; /* trick for scroll-view to fill space */
+}
+
+.team-member-list-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12rpx 20rpx 12rpx 60rpx;
+  border-bottom: 1rpx solid rgba(255,255,255,0.1);
+}
+
+.tm-col-name {
+  flex: 1;
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.4);
+}
+
+.tm-col-today, .tm-col-total {
+  width: 110rpx;
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.4);
+  text-align: right;
+}
+
+.team-member-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 20rpx 20rpx 20rpx 0;
+  border-left: 6rpx solid;
+  border-bottom: 1rpx solid rgba(255,255,255,0.06);
+  padding-left: 16rpx;
+  border-radius: 0 12rpx 12rpx 0;
+  margin-bottom: 4rpx;
+}
+
+.tm-rank {
+  width: 44rpx;
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tm-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-name {
+  font-size: 28rpx;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.tm-id {
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.4);
+  margin-top: 4rpx;
+}
+
+.tm-today {
+  width: 110rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  text-align: right;
+}
+
+.tm-cumulative {
+  width: 110rpx;
+  font-size: 28rpx;
+  color: #f5d76e;
+  font-weight: 700;
+  text-align: right;
+}
+
+.team-empty {
+  padding: 60rpx 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-empty-text {
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.3);
+  text-align: center;
+}
+
+.team-total-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 20rpx;
+  border-top: 2rpx solid rgba(255,255,255,0.15);
+  margin-top: 8rpx;
+}
+
+.team-total-label {
+  font-size: 28rpx;
+  color: rgba(255,255,255,0.7);
+  font-weight: 600;
+}
+
+.team-total-value {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+
+/* ── Team Dialog ── */
+.team-dialog-box {
+  background: #ffffff;
+  border-radius: 32rpx;
+  padding: 0 0 40rpx;
+  width: 620rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.3);
+}
+
+.team-dialog-header {
+  background: linear-gradient(135deg, #2c7c41, #1a4a2e);
+  width: 100%;
+  padding: 48rpx 40rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  margin-bottom: 40rpx;
+}
+
+.team-dialog-icon {
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+}
+
+.team-dialog-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #f5d76e;
+  margin-bottom: 10rpx;
+}
+
+.team-dialog-subtitle {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.75);
+  text-align: center;
+}
+
+.team-input-wrap {
+  width: 100%;
+  padding: 0 40rpx;
+  box-sizing: border-box;
+  margin-bottom: 16rpx;
+}
+
+.team-input {
+  width: 100%;
+  height: 88rpx;
+  border: 2rpx solid #d8d8d8;
+  border-radius: 16rpx;
+  padding: 0 28rpx;
+  font-size: 30rpx;
+  color: #333;
+  background-color: #f9f9f9;
+  box-sizing: border-box;
+}
+
+.team-input-placeholder {
+  color: #bbb;
+  font-size: 28rpx;
+}
+
+.team-error-msg {
+  width: 100%;
+  padding: 0 40rpx;
+  box-sizing: border-box;
+  margin-bottom: 8rpx;
+}
+
+.team-error-text {
+  font-size: 22rpx;
+  color: #c0392b;
+}
+
+.team-enter-btn {
+  width: calc(100% - 80rpx);
+  height: 92rpx;
+  background: linear-gradient(135deg, #2c7c41, #1a5a30);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  border-radius: 46rpx;
+  line-height: 92rpx;
+  margin-top: 24rpx;
+  margin-bottom: 0;
+  box-shadow: 0 8rpx 24rpx rgba(44,124,65,0.35);
+}
+.team-enter-btn::after { border: none; }
+
+.team-cancel-btn {
+  width: calc(100% - 80rpx);
+  height: 76rpx;
+  background: none;
+  color: #aaa;
+  font-size: 26rpx;
+  line-height: 76rpx;
+  margin-top: 8rpx;
+}
+.team-cancel-btn::after { border: none; }
 </style>
