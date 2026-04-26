@@ -138,7 +138,6 @@
             <text class="team-header-sub" v-if="myTeam === selectedViewTeam">我的团队 · {{ myStudentId }}</text>
             <text class="team-header-sub" v-else>活动周期：2026.05.04 — 2026.10.22</text>
           </view>
-          <button v-if="myTeam === selectedViewTeam" class="team-leave-btn" @click="leaveTeam">退出</button>
           <view class="team-header-stat">
             <text class="team-total-km">{{ teamTotalKm }}</text>
             <text class="team-total-km-unit">公里</text>
