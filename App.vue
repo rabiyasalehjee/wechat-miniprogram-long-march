@@ -1,19 +1,23 @@
 <script>
 	export default {
 		onLaunch: function() {
-			console.log('App Launch');
-			// Initialize WeChat Cloud — env will be resolved dynamically
+			// Initialize WeChat Cloud
 			if (wx.cloud) {
 				wx.cloud.init({ env: 'cloud1-d5gm01xjv12142933', traceUser: true });
-				console.log('wx.cloud initialized');
+			}
+
+			// ── Privacy authorization handler (required by WeChat privacy rules) ──
+			// WeChat calls this automatically before any sensitive API (getWeRunData, chooseAvatar, etc.)
+			// We must call resolve({ buttonId, event }) to confirm, or resolve({ event: 'ignore' }) to cancel.
+			if (wx.onNeedPrivacyAuthorization) {
+				wx.onNeedPrivacyAuthorization(resolve => {
+					// Show WeChat's built-in privacy popup, then resolve when user taps agree
+					uni.$emit('needPrivacyAuth', resolve);
+				});
 			}
 		},
-		onShow: function() {
-			console.log('App Show')
-		},
-		onHide: function() {
-			console.log('App Hide')
-		}
+		onShow: function() {},
+		onHide: function() {}
 	}
 </script>
 

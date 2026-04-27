@@ -301,6 +301,22 @@
       </view>
     </view>
 
+    <!-- Privacy Authorization Modal -->
+    <view v-if="showPrivacyModal" class="modal-mask">
+      <view class="privacy-box">
+        <text class="privacy-title">用户隐私保护提示</text>
+        <text class="privacy-body">在使用本功能前，请阅读并同意我们的隐私保护指引。我们将收集以下信息用于提供服务：</text>
+        <view class="privacy-list">
+          <text class="privacy-item">· 微信昵称和头像，用于在排行榜中显示</text>
+          <text class="privacy-item">· 微信运动步数，用于记录运动情况</text>
+        </view>
+        <view class="privacy-btns">
+          <button class="privacy-btn-cancel" @click="onPrivacyReject">拒绝</button>
+          <button class="privacy-btn-agree" id="agreePrivacyBtn" open-type="agreePrivacyAuthorization" @agreeprivacyauthorization="onPrivacyAgree">同意</button>
+        </view>
+      </view>
+    </view>
+
   </view>
 </template>
 
@@ -330,6 +346,8 @@ export default {
       mapHeight: 0,
       syncDays: 0,
       // Teams
+      showPrivacyModal: false,
+      privacyResolve: null,
       showTeamDialog: false,
       teamIdInput: '',
       teamErrorMsg: '',
@@ -427,6 +445,11 @@ export default {
     }
   },
   mounted() {
+    // Listen for privacy auth requests from App.vue
+    uni.$on('needPrivacyAuth', (resolve) => {
+      this.privacyResolve = resolve;
+      this.showPrivacyModal = true;
+    });
     this.loadLocalData();
     // Load team assignment
     const savedTeam = uni.getStorageSync('myTeam');
@@ -943,6 +966,21 @@ export default {
     },
     doSync(nickname, avatarUrl) {
       this.sendToServer(this.pendingSyncCode, this.pendingSyncEncryptedData, this.pendingSyncIv, nickname, avatarUrl);
+    },
+    onPrivacyAgree() {
+      this.showPrivacyModal = false;
+      if (this.privacyResolve) {
+        this.privacyResolve({ buttonId: 'agreePrivacyBtn', event: 'agree' });
+        this.privacyResolve = null;
+      }
+    },
+    onPrivacyReject() {
+      this.showPrivacyModal = false;
+      if (this.privacyResolve) {
+        this.privacyResolve({ event: 'ignore' });
+        this.privacyResolve = null;
+      }
+      uni.showToast({ title: '已拒绝，部分功能不可用', icon: 'none' });
     },
     onTeamIdInput(e) {
       this.teamIdInput = e.detail.value;
@@ -2014,4 +2052,72 @@ page {
   margin-top: 8rpx;
 }
 .team-cancel-btn::after { border: none; }
+
+/* ── Privacy Modal ── */
+.privacy-box {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx 36rpx;
+  width: 600rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.privacy-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1a3a20;
+  margin-bottom: 20rpx;
+  text-align: center;
+}
+
+.privacy-body {
+  font-size: 26rpx;
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+}
+
+.privacy-list {
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 36rpx;
+}
+
+.privacy-item {
+  font-size: 24rpx;
+  color: #444;
+  line-height: 1.8;
+  display: block;
+}
+
+.privacy-btns {
+  display: flex;
+  flex-direction: row;
+  gap: 20rpx;
+}
+
+.privacy-btn-cancel {
+  flex: 1;
+  height: 80rpx;
+  background: #f0f0f0;
+  color: #888;
+  font-size: 28rpx;
+  border-radius: 40rpx;
+  line-height: 80rpx;
+}
+.privacy-btn-cancel::after { border: none; }
+
+.privacy-btn-agree {
+  flex: 1;
+  height: 80rpx;
+  background: #2c7c41;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 40rpx;
+  line-height: 80rpx;
+}
+.privacy-btn-agree::after { border: none; }
 </style>
