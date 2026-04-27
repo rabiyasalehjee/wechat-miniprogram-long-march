@@ -212,7 +212,7 @@
       <view class="stats-row">
         <view class="stats-cell">
           <text class="stats-label">兑换比例</text>
-          <text class="stats-value stats-small">1步 = 1步</text>
+          <text class="stats-value stats-small">1步 = 0.7米</text>
         </view>
         <view class="stats-cell">
           <text class="stats-label">累计里程</text>
@@ -420,10 +420,10 @@ export default {
       return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
     },
     todayKm() {
-      return (this.todaysSteps / 1300).toFixed(1);
+      return (this.todaysSteps * 0.0007).toFixed(2);
     },
     totalKm() {
-      return (this.totalStepsHistory / 1300).toFixed(1);
+      return (this.totalStepsHistory * 0.0007).toFixed(2);
     },
     teamMembersSorted() {
       return [...this.teamMembers].sort((a, b) => b.cumulativeKm - a.cumulativeKm);
@@ -1073,9 +1073,10 @@ export default {
             that.saveData();
             uni.showToast({ title: '步数已更新！', icon: 'success' });
 
-            // Animate growth from old to new steps
             if (that.activeTab === 'today') {
               that.initMapAndAnimate(oldSteps, that.todaysSteps);
+            } else if (that.activeTab === 'period') {
+              that.fetchLeaderboard();
             }
           } else {
             uni.showToast({ title: res.result.msg || '出错了，请重试', icon: 'none' });
