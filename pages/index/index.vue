@@ -93,7 +93,10 @@
               @error="item.avatarUrl = '/static/default-avatar.png'"
             />
           </view>
-          <text class="leader-name">{{ item.nickname || '微信用户' }}</text>
+          <view class="leader-info">
+            <text class="leader-name">{{ item.nickname || '微信用户' }}</text>
+            <text v-if="leaderboardTeamName(item)" class="leader-team">{{ leaderboardTeamName(item) }}</text>
+          </view>
           <text class="leader-steps">{{ item.todaySteps.toLocaleString() }} 步</text>
         </view>
         <view v-if="leaderboard.length === 0" class="empty-wrap">
@@ -108,22 +111,22 @@
       <!-- Team Selector (top nav style) -->
       <view class="team-selector-bar">
         <view class="team-selector-item" @click="selectViewTeam('Team1')">
-          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team1' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第一队</text>
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team1' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">红25军</text>
           <view class="active-line" v-if="selectedViewTeam === 'Team1'"></view>
         </view>
         <view class="tab-divider"></view>
         <view class="team-selector-item" @click="selectViewTeam('Team2')">
-          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team2' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第二队</text>
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team2' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">红二方面军</text>
           <view class="active-line" v-if="selectedViewTeam === 'Team2'"></view>
         </view>
         <view class="tab-divider"></view>
         <view class="team-selector-item" @click="selectViewTeam('Team3')">
-          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team3' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第三队</text>
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team3' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">红四方面军</text>
           <view class="active-line" v-if="selectedViewTeam === 'Team3'"></view>
         </view>
         <view class="tab-divider"></view>
         <view class="team-selector-item" @click="selectViewTeam('Team4')">
-          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team4' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">第四队</text>
+          <text class="team-selector-text" :style="{ color: selectedViewTeam === 'Team4' ? '#ffffff' : 'rgba(255,255,255,0.5)' }">红一方面军</text>
           <view class="active-line" v-if="selectedViewTeam === 'Team4'"></view>
         </view>
       </view>
@@ -357,7 +360,7 @@ export default {
       teamTotalKm: 0,
       teamLoading: false,
       teamChineseName: {
-        'Team1': '第一队', 'Team2': '第二队', 'Team3': '第三队', 'Team4': '第四队'
+        'Team1': '红25军', 'Team2': '红二方面军', 'Team3': '红四方面军', 'Team4': '红一方面军'
       },
       teamColors: {
         'Team1': { primary: '#c0392b', light: 'rgba(192,57,43,0.15)', name: '红队' },
@@ -844,6 +847,15 @@ export default {
         }
       });
     },
+    leaderboardTeamName(item) {
+      if (!item || !item.studentId) return '';
+      for (const [team, ids] of Object.entries(this.teamData)) {
+        if (ids.includes(item.studentId)) {
+          return this.teamChineseName[team] || '';
+        }
+      }
+      return '';
+    },
     onChooseAvatar(e) {
       this.tempAvatarUrl = e.detail.avatarUrl;
     },
@@ -1043,6 +1055,7 @@ export default {
         confirmColor: '#c0392b',
         success: (res) => {
           if (res.confirm) {
+            wx.cloud.callFunction({ name: 'getSteps', data: { action: 'clearTeamMember' } });
             this.myTeam = '';
             this.myStudentId = '';
             uni.removeStorageSync('myTeam');
@@ -1455,11 +1468,24 @@ page {
   height: 80rpx;
 }
 
-.leader-name {
+.leader-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.leader-name {
   font-size: 28rpx;
   color: #ffffff;
   font-weight: 500;
+}
+
+.leader-team {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
 }
 
 .leader-steps {

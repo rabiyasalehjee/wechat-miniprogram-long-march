@@ -96,6 +96,17 @@ exports.main = async (event, context) => {
     return { success: true }
   }
 
+  // ── Unlink student ID from this user ──
+  if (event.action === 'clearTeamMember') {
+    const userRecord = await db.collection('userSteps').where({ _openid: openid }).get()
+    if (userRecord.data.length > 0) {
+      await db.collection('userSteps').doc(userRecord.data[0]._id).update({
+        data: { studentId: _.remove() }
+      })
+    }
+    return { success: true }
+  }
+
   // ── Fetch team data ──
   if (event.action === 'getTeamData') {
     const { teamName } = event
