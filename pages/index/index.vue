@@ -859,8 +859,8 @@ export default {
           for (let i = 1; i < points.length; i++) {
             const prev = points[i - 1];
             const cur = points[i];
-            const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -18 : 18);
-            const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 14 : -10);
+            const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -10 : 10);
+            const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 8 : -6);
             ctx.quadraticCurveTo(cx, cy, cur.x, cur.y);
           }
           ctx.setStrokeStyle('rgba(190, 23, 30, 0.86)');
@@ -881,11 +881,11 @@ export default {
 
         ctx.clearRect(0, 0, width, height);
         const routePoints = [
-          p(50, 92), p(41, 88), p(31, 90), p(20, 84), p(13, 76),
-          p(22, 70), p(31, 73), p(25, 65), p(15, 60), p(23, 53),
-          p(34, 56), p(29, 48), p(18, 44), p(27, 37), p(39, 40),
-          p(34, 32), p(23, 28), p(32, 24), p(43, 27), p(38, 21),
-          p(48, 17), p(54, 15)
+          p(51, 91), p(42, 88), p(31, 90), p(20, 86), p(13, 78),
+          p(18, 70), p(29, 69), p(23, 61), p(14, 55), p(21, 48),
+          p(33, 50), p(42, 44), p(35, 37), p(24, 38), p(16, 31),
+          p(24, 24), p(36, 26), p(47, 21), p(42, 15), p(53, 13),
+          p(59, 16)
         ];
         drawPath(routePoints, 2);
         [4, 9, 14, 19].forEach(i => drawRouteDot(routePoints[i]));
