@@ -18,57 +18,69 @@
 
     <!-- Tab 1: 今日榜单 -->
     <view v-if="activeTab === 'today'" class="tab1-wrapper">
-      <view class="title-section">
-        <image class="title-image" src="/static/title.png" mode="widthFix" />
-        <view class="countdown-badge">
-          <text class="countdown-text">距离活动结束还有{{ daysLeft }}天</text>
-        </view>
-      </view>
-      <view class="tab1-content" id="map-container">
-        <!-- Route Canvas for Lines (Using v-if to completely remove native component from DOM while modal is open) -->
-        <canvas 
-          v-if="!showProfileModal"
-          canvas-id="routeCanvas" 
-          id="routeCanvas" 
-          class="route-canvas"
+      <view class="map-image-section">
+        <image class="map-image" src="/static/map-img.png" mode="aspectFill" />
+        <canvas
+          canvas-id="redRouteOverlayCanvas"
+          id="redRouteOverlayCanvas"
+          class="red-route-overlay-canvas"
         ></canvas>
-        
-        <!-- Checkpoint Markers -->
-        <view 
-          v-if="!showProfileModal"
-          v-for="(cp, index) in checkpoints" 
-          :key="index"
-          class="checkpoint"
-          :class="[
-            (index === 0 || index === checkpoints.length - 1) ? 'checkpoint-star' : 'checkpoint-dot',
-            index < currentCheckpointIndex ? 'checkpoint-active' : 'checkpoint-inactive'
-          ]"
-          :style="{ left: cp.x + '%', top: cp.y + '%' }"
-        >
-          <text class="cp-star" v-if="index === 0 || index === checkpoints.length - 1">★</text>
-          <view v-if="index > 0 && index < currentCheckpointIndex" class="pulse-ring"></view>
-        </view>
-        
-        <!-- Checkpoint Labels (Rendered outside the blinking view to prevent blinking) -->
-        <view 
-          v-if="!showProfileModal"
-          v-for="(cp, index) in checkpoints" 
-          :key="'label-'+index"
-          class="checkpoint-label-container"
-          :style="{ left: cp.x + '%', top: cp.y + '%' }"
-        >
-          <text v-if="index === checkpoints.length - 1" class="final-text">终点150000步</text>
-          <text v-if="cp.label" class="cp-label" :class="'label-' + cp.pos" :style="cp.style">{{ cp.label }}</text>
-        </view>
+      </view>
 
-        <!-- User progress marker: ONE checkpoint icon at the tip of the yellow line -->
-        <view
-          v-if="userPosition && !showProfileModal && drawnSteps > 0"
-          class="user-marker"
-          :style="{ left: userPosition.x + '%', top: userPosition.y + '%' }"
-        >
-          <image src="/static/checkpoint.png" class="user-marker-img" mode="aspectFit" />
-          <text class="user-marker-steps" :class="'user-steps-' + userMarkerTextPos">{{ todaysSteps.toLocaleString() }}</text>
+      <!-- this section was the main section display route code that has been set to display none -->
+      <view class="main-route-code-hidden">
+        <view class="title-section">
+          <image class="title-image" src="/static/title.png" mode="widthFix" />
+          <view class="countdown-badge">
+            <text class="countdown-text">距离活动结束还有{{ daysLeft }}天</text>
+          </view>
+        </view>
+        <view class="tab1-content" id="map-container">
+          <!-- Route Canvas for Lines (Using v-if to completely remove native component from DOM while modal is open) -->
+          <canvas 
+            v-if="!showProfileModal"
+            canvas-id="routeCanvas" 
+            id="routeCanvas" 
+            class="route-canvas"
+          ></canvas>
+          
+          <!-- Checkpoint Markers -->
+          <view 
+            v-if="!showProfileModal"
+            v-for="(cp, index) in checkpoints" 
+            :key="index"
+            class="checkpoint"
+            :class="[
+              (index === 0 || index === checkpoints.length - 1) ? 'checkpoint-star' : 'checkpoint-dot',
+              index < currentCheckpointIndex ? 'checkpoint-active' : 'checkpoint-inactive'
+            ]"
+            :style="{ left: cp.x + '%', top: cp.y + '%' }"
+          >
+            <text class="cp-star" v-if="index === 0 || index === checkpoints.length - 1">★</text>
+            <view v-if="index > 0 && index < currentCheckpointIndex" class="pulse-ring"></view>
+          </view>
+          
+          <!-- Checkpoint Labels (Rendered outside the blinking view to prevent blinking) -->
+          <view 
+            v-if="!showProfileModal"
+            v-for="(cp, index) in checkpoints" 
+            :key="'label-'+index"
+            class="checkpoint-label-container"
+            :style="{ left: cp.x + '%', top: cp.y + '%' }"
+          >
+            <text v-if="index === checkpoints.length - 1" class="final-text">终点150000步</text>
+            <text v-if="cp.label" class="cp-label" :class="'label-' + cp.pos" :style="cp.style">{{ cp.label }}</text>
+          </view>
+
+          <!-- User progress marker: ONE checkpoint icon at the tip of the yellow line -->
+          <view
+            v-if="userPosition && !showProfileModal && drawnSteps > 0"
+            class="user-marker"
+            :style="{ left: userPosition.x + '%', top: userPosition.y + '%' }"
+          >
+            <image src="/static/checkpoint.png" class="user-marker-img" mode="aspectFit" />
+            <text class="user-marker-steps" :class="'user-steps-' + userMarkerTextPos">{{ todaysSteps.toLocaleString() }}</text>
+          </view>
         </view>
       </view>
     </view>
@@ -477,6 +489,7 @@ export default {
     if (this.activeTab === 'today') {
       this.$nextTick(() => {
         setTimeout(() => {
+          this.drawRedRouteOverlay();
           this.initMapAndAnimate(0, this.todaysSteps);
         }, 300);
       });
@@ -824,11 +837,60 @@ export default {
       } else if (tab === 'today') {
         this.$nextTick(() => {
           setTimeout(() => {
+            this.drawRedRouteOverlay();
             this.drawnSteps = this.todaysSteps; // Snap directly on tab switch
             this.initMapAndAnimate(this.todaysSteps, this.todaysSteps);
           }, 100);
         });
       }
+    },
+    drawRedRouteOverlay() {
+      const query = uni.createSelectorQuery().in(this);
+      query.select('.map-image-section').boundingClientRect(rect => {
+        if (!rect) return;
+        const width = rect.width;
+        const height = rect.height;
+        const ctx = uni.createCanvasContext('redRouteOverlayCanvas', this);
+        const p = (x, y) => ({ x: (x / 100) * width, y: (y / 100) * height });
+        const drawPath = (points, strokeWidth) => {
+          if (!points.length) return;
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          for (let i = 1; i < points.length; i++) {
+            const prev = points[i - 1];
+            const cur = points[i];
+            const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -18 : 18);
+            const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 14 : -10);
+            ctx.quadraticCurveTo(cx, cy, cur.x, cur.y);
+          }
+          ctx.setStrokeStyle('rgba(190, 23, 30, 0.86)');
+          ctx.setLineWidth(strokeWidth);
+          ctx.setLineCap('round');
+          ctx.setLineJoin('round');
+          ctx.stroke();
+        };
+        const drawRouteDot = point => {
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+          ctx.setFillStyle('rgba(190, 23, 30, 0.95)');
+          ctx.fill();
+          ctx.setStrokeStyle('rgba(255, 245, 220, 0.9)');
+          ctx.setLineWidth(1.5);
+          ctx.stroke();
+        };
+
+        ctx.clearRect(0, 0, width, height);
+        const routePoints = [
+          p(50, 92), p(41, 88), p(31, 90), p(20, 84), p(13, 76),
+          p(22, 70), p(31, 73), p(25, 65), p(15, 60), p(23, 53),
+          p(34, 56), p(29, 48), p(18, 44), p(27, 37), p(39, 40),
+          p(34, 32), p(23, 28), p(32, 24), p(43, 27), p(38, 21),
+          p(48, 17), p(54, 15)
+        ];
+        drawPath(routePoints, 2);
+        [4, 9, 14, 19].forEach(i => drawRouteDot(routePoints[i]));
+        ctx.draw();
+      }).exec();
     },
     fetchLeaderboard() {
       this.leaderboardLoading = true;
@@ -1211,6 +1273,36 @@ page {
   overflow: hidden;
 }
 
+.map-image-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+}
+
+.map-image {
+  width: 100%;
+  height: 100%;
+}
+
+.red-route-overlay-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* this section was the main section display route code that has been set to display none */
+.main-route-code-hidden {
+  display: none;
+}
+
 .title-section {
   flex-shrink: 0;
   display: flex;
@@ -1503,7 +1595,7 @@ page {
 /* ── Stats Panel ── */
 .stats-panel {
   background-color: #ffffff;
-  border-radius: 28rpx 28rpx 0 0;
+  border-radius: 0;
   flex-shrink: 0;
   position: relative;
   z-index: 1;
