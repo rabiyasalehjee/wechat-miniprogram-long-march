@@ -135,8 +135,7 @@
         <view class="team-header-banner">
           <view class="team-header-info">
             <text class="team-header-name">{{ teamChineseName[selectedViewTeam] || selectedViewTeam }}</text>
-            <text class="team-header-sub" v-if="myTeam === selectedViewTeam">我的团队 · {{ myStudentId }}</text>
-            <text class="team-header-sub" v-else>活动周期：2026.05.04 — 2026.10.22</text>
+            <text class="team-header-sub">活动周期：2026.05.04 — 2026.10.22</text>
           </view>
           <view class="team-header-stat">
             <text class="team-total-km">{{ teamTotalKm }}</text>
