@@ -100,9 +100,9 @@
           <view class="avatar-wrap">
             <image
               class="avatar"
-              :src="item.avatarUrl || '/static/default-avatar.png'"
+              :src="item.avatarUrl || '/static/user.png'"
               mode="aspectFill"
-              @error="item.avatarUrl = '/static/default-avatar.png'"
+              @error="item.avatarUrl = '/static/user.png'"
             />
           </view>
           <view class="leader-info">
@@ -177,9 +177,16 @@
             v-for="(m, i) in teamMembersSorted"
             :key="m.studentId"
             class="team-member-row"
-            :class="{ 'team-member-mine': m.studentId === myStudentId }"
           >
             <text class="tm-rank" :class="{ 'tm-rank-gold': i === 0, 'tm-rank-silver': i === 1, 'tm-rank-bronze': i === 2 }">{{ i + 1 }}</text>
+            <view class="tm-avatar-wrap">
+              <image
+                class="tm-avatar"
+                :src="m.avatarUrl || '/static/user.png'"
+                mode="aspectFill"
+                @error="m.avatarUrl = '/static/user.png'"
+              />
+            </view>
             <view class="tm-info">
               <text class="tm-name">{{ m.nickname }}</text>
               <text class="tm-id">{{ m.studentId }}</text>
@@ -294,7 +301,7 @@
         <button class="avatar-picker-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
           <image
             class="modal-avatar"
-            :src="tempAvatarUrl || '/static/default-avatar.png'"
+            :src="tempAvatarUrl || '/static/user.png'"
             mode="aspectFill"
           />
           <text class="avatar-picker-label">点击选择头像</text>
@@ -371,14 +378,16 @@ export default {
       teamMembers: [],
       teamTotalKm: 0,
       teamLoading: false,
+      teamRouteTotals: { Team1: 0, Team2: 0, Team3: 0, Team4: 0 },
+      teamRouteProgress: { Team1: 0, Team2: 0, Team3: 0, Team4: 0 },
       teamChineseName: {
         'Team1': '红25军', 'Team2': '红二方面军', 'Team3': '红四方面军', 'Team4': '红一方面军'
       },
       teamColors: {
-        'Team1': { primary: '#c0392b', light: 'rgba(192,57,43,0.15)', name: '红队' },
-        'Team2': { primary: '#2980b9', light: 'rgba(41,128,185,0.15)', name: '蓝队' },
-        'Team3': { primary: '#d35400', light: 'rgba(211,84,0,0.15)',   name: '橙队' },
-        'Team4': { primary: '#8e44ad', light: 'rgba(142,68,173,0.15)', name: '紫队' }
+        'Team1': { primary: '#c0392b', light: 'rgba(192,57,43,0.15)', name: '红25军' },
+        'Team2': { primary: '#F5D327', light: 'rgba(245,211,39,0.15)', name: '红二方面军' },
+        'Team3': { primary: '#2980b9', light: 'rgba(41,128,185,0.15)', name: '红四方面军' },
+        'Team4': { primary: '#27ae60', light: 'rgba(39,174,96,0.15)', name: '红一方面军' }
       },
       teamData: {
         'Team1': ['21B908040','23B308006','23B908051','24B908021','25B308027','21B908014','22B908026','23B908033','25B908031','25B308018','22B908036'],
@@ -406,7 +415,9 @@ export default {
   },
   computed: {
     remainingSteps() {
-      const rem = this.stepTarget - this.todaysSteps;
+      const teamSteps = this.myTeam ? Math.floor((this.teamRouteTotals[this.myTeam] || 0) / 0.0007) : 0;
+      const currentSteps = this.myTeam ? teamSteps : this.todaysSteps;
+      const rem = this.stepTarget - currentSteps;
       return (rem > 0 ? rem : 0).toLocaleString();
     },
     daysLeft() {
@@ -489,7 +500,7 @@ export default {
     if (this.activeTab === 'today') {
       this.$nextTick(() => {
         setTimeout(() => {
-          this.drawRedRouteOverlay();
+          this.fetchAllTeamRouteTotals(false);
           this.initMapAndAnimate(0, this.todaysSteps);
         }, 300);
       });
@@ -837,14 +848,66 @@ export default {
       } else if (tab === 'today') {
         this.$nextTick(() => {
           setTimeout(() => {
-            this.drawRedRouteOverlay();
+            this.fetchAllTeamRouteTotals(true);
             this.drawnSteps = this.todaysSteps; // Snap directly on tab switch
             this.initMapAndAnimate(this.todaysSteps, this.todaysSteps);
           }, 100);
         });
       }
     },
-    drawRedRouteOverlay() {
+    fetchAllTeamRouteTotals(animated = true) {
+      const teams = Object.keys(this.teamData);
+      let pending = teams.length;
+      const previousProgress = { ...this.teamRouteProgress };
+      teams.forEach(teamName => {
+        wx.cloud.callFunction({
+          name: 'getSteps',
+          data: { action: 'getTeamData', teamName },
+          success: (res) => {
+            if (res.result && res.result.success) {
+              this.teamRouteTotals[teamName] = res.result.totalKm || 0;
+            }
+          },
+          complete: () => {
+            pending -= 1;
+            if (pending === 0) this.updateTeamRouteProgress(animated, previousProgress);
+          }
+        });
+      });
+    },
+    updateTeamRouteProgress(animated = true, startProgressOverride = null) {
+      const targetProgress = {};
+      Object.keys(this.teamData).forEach(team => {
+        const totalSteps = (this.teamRouteTotals[team] || 0) / 0.0007;
+        targetProgress[team] = Math.min(1, totalSteps / this.stepTarget);
+      });
+
+      if (!animated) {
+        this.teamRouteProgress = { ...targetProgress };
+        this.drawTeamRouteOverlay(this.teamRouteProgress);
+        return;
+      }
+
+      const startProgress = startProgressOverride || { ...this.teamRouteProgress };
+      const duration = 1600;
+      const startTime = Date.now();
+      const step = () => {
+        const t = Math.min(1, (Date.now() - startTime) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const current = {};
+        Object.keys(targetProgress).forEach(team => {
+          current[team] = startProgress[team] + (targetProgress[team] - startProgress[team]) * eased;
+        });
+        this.drawTeamRouteOverlay(current);
+        if (t < 1) {
+          setTimeout(step, 16);
+        } else {
+          this.teamRouteProgress = { ...targetProgress };
+        }
+      };
+      step();
+    },
+    drawTeamRouteOverlay(progressByTeam = this.teamRouteProgress) {
       const query = uni.createSelectorQuery().in(this);
       query.select('.map-image-section').boundingClientRect(rect => {
         if (!rect) return;
@@ -852,7 +915,85 @@ export default {
         const height = rect.height;
         const ctx = uni.createCanvasContext('redRouteOverlayCanvas', this);
         const p = (x, y) => ({ x: (x / 100) * width, y: (y / 100) * height });
-        const drawPath = (points, strokeWidth) => {
+        const rgba = (hex, alpha) => {
+          const raw = hex.replace('#', '');
+          const r = parseInt(raw.slice(0, 2), 16);
+          const g = parseInt(raw.slice(2, 4), 16);
+          const b = parseInt(raw.slice(4, 6), 16);
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        };
+        const getTeamRoutePoints = team => {
+          const routes = {
+            Team1: [
+              p(51, 91), p(42, 88), p(31, 90), p(20, 86), p(13, 78),
+              p(18, 70), p(29, 69), p(23, 61), p(14, 55), p(21, 48),
+              p(33, 50), p(42, 44), p(35, 37), p(24, 38), p(16, 31),
+              p(24, 24), p(36, 26), p(47, 21), p(42, 15), p(53, 13),
+              p(59, 16)
+            ],
+            Team2: [
+              p(45, 94), p(35, 91), p(25, 88), p(14, 90), p(7, 82),
+              p(13, 75), p(23, 73), p(17, 66), p(9, 59), p(17, 53),
+              p(28, 55), p(36, 49), p(28, 43), p(19, 44), p(11, 37),
+              p(20, 31), p(31, 33), p(42, 28), p(35, 21), p(45, 18),
+              p(53, 20)
+            ],
+            Team3: [
+              p(58, 89), p(49, 85), p(39, 87), p(30, 82), p(20, 81),
+              p(15, 73), p(25, 69), p(36, 71), p(31, 62), p(21, 58),
+              p(28, 50), p(40, 52), p(49, 46), p(41, 39), p(31, 40),
+              p(23, 33), p(33, 27), p(45, 29), p(54, 23), p(49, 17),
+              p(59, 13)
+            ],
+            Team4: [
+              p(56, 95), p(47, 93), p(37, 90), p(28, 92), p(19, 85),
+              p(26, 78), p(38, 77), p(32, 69), p(22, 65), p(16, 57),
+              p(26, 50), p(38, 52), p(48, 46), p(43, 40), p(32, 36),
+              p(24, 29), p(35, 24), p(47, 26), p(56, 21), p(51, 15),
+              p(62, 12)
+            ]
+          };
+          return routes[team] || routes.Team1;
+        };
+        const pointAtProgress = (points, progress) => {
+          if (progress <= 0) return [];
+          if (progress >= 1) return points;
+          const lengths = [];
+          let total = 0;
+          for (let i = 1; i < points.length; i++) {
+            const len = Math.sqrt(Math.pow(points[i].x - points[i - 1].x, 2) + Math.pow(points[i].y - points[i - 1].y, 2));
+            lengths.push(len);
+            total += len;
+          }
+          let remaining = total * progress;
+          const partial = [points[0]];
+          for (let i = 1; i < points.length; i++) {
+            const len = lengths[i - 1];
+            if (remaining >= len) {
+              partial.push(points[i]);
+              remaining -= len;
+            } else {
+              const ratio = len === 0 ? 0 : remaining / len;
+              partial.push({
+                x: points[i - 1].x + (points[i].x - points[i - 1].x) * ratio,
+                y: points[i - 1].y + (points[i].y - points[i - 1].y) * ratio
+              });
+              break;
+            }
+          }
+          return partial;
+        };
+        const progressAtPoint = (points, pointIndex) => {
+          let total = 0;
+          let distanceToPoint = 0;
+          for (let i = 1; i < points.length; i++) {
+            const len = Math.sqrt(Math.pow(points[i].x - points[i - 1].x, 2) + Math.pow(points[i].y - points[i - 1].y, 2));
+            total += len;
+            if (i <= pointIndex) distanceToPoint += len;
+          }
+          return total === 0 ? 1 : distanceToPoint / total;
+        };
+        const drawPath = (points, strokeWidth, color) => {
           if (!points.length) return;
           ctx.beginPath();
           ctx.moveTo(points[0].x, points[0].y);
@@ -863,32 +1004,50 @@ export default {
             const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 8 : -6);
             ctx.quadraticCurveTo(cx, cy, cur.x, cur.y);
           }
-          ctx.setStrokeStyle('rgba(190, 23, 30, 0.86)');
+          ctx.setStrokeStyle(color);
           ctx.setLineWidth(strokeWidth);
           ctx.setLineCap('round');
           ctx.setLineJoin('round');
           ctx.stroke();
         };
-        const drawRouteDot = point => {
+        const drawRouteDot = (point, color) => {
           ctx.beginPath();
-          ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-          ctx.setFillStyle('rgba(190, 23, 30, 0.95)');
+          ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+          ctx.setFillStyle(color);
           ctx.fill();
-          ctx.setStrokeStyle('rgba(255, 245, 220, 0.9)');
-          ctx.setLineWidth(1.5);
+          ctx.setStrokeStyle('rgba(255, 245, 220, 0.7)');
+          ctx.setLineWidth(1);
           ctx.stroke();
+        };
+        const drawTeamCheckpoint = (team, point, alpha) => {
+          if (!point) return;
+          const teamNumber = team.replace('Team', '');
+          const size = this.myTeam === team ? 30 : 24;
+          if (ctx.setGlobalAlpha) ctx.setGlobalAlpha(alpha);
+          ctx.drawImage(`/static/team${teamNumber}-checkpoint.png`, point.x - size / 2, point.y - size, size, size);
+          if (ctx.setGlobalAlpha) ctx.setGlobalAlpha(1);
         };
 
         ctx.clearRect(0, 0, width, height);
-        const routePoints = [
-          p(51, 91), p(42, 88), p(31, 90), p(20, 86), p(13, 78),
-          p(18, 70), p(29, 69), p(23, 61), p(14, 55), p(21, 48),
-          p(33, 50), p(42, 44), p(35, 37), p(24, 38), p(16, 31),
-          p(24, 24), p(36, 26), p(47, 21), p(42, 15), p(53, 13),
-          p(59, 16)
-        ];
-        drawPath(routePoints, 2);
-        [4, 9, 14, 19].forEach(i => drawRouteDot(routePoints[i]));
+        Object.keys(this.teamData).forEach(team => {
+          drawPath(getTeamRoutePoints(team), 2.6, 'rgba(92, 92, 92, 0.45)');
+        });
+        Object.keys(this.teamData).forEach(team => {
+          const routePoints = getTeamRoutePoints(team);
+          const teamColor = this.teamColors[team].primary;
+          const isMine = this.myTeam === team;
+          const alpha = !this.myTeam || isMine ? 0.95 : 0.32;
+          const teamProgress = progressByTeam[team] || 0;
+          const partial = pointAtProgress(routePoints, teamProgress);
+          drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
+          [4, 9, 14, 19].forEach(i => {
+            const dotIsFilled = teamProgress >= progressAtPoint(routePoints, i);
+            drawRouteDot(routePoints[i], dotIsFilled ? rgba(teamColor, alpha) : 'rgba(92, 92, 92, 0.65)');
+          });
+          if ((progressByTeam[team] || 0) >= 1) {
+            drawTeamCheckpoint(team, routePoints[routePoints.length - 1], alpha);
+          }
+        });
         ctx.draw();
       }).exec();
     },
@@ -1070,16 +1229,29 @@ export default {
         this.teamErrorMsg = '未找到该学工号，请确认后重新输入';
         return;
       }
-      this.myTeam = foundTeam;
-      this.myStudentId = id;
-      this.selectedViewTeam = foundTeam;
-      uni.setStorageSync('myTeam', foundTeam);
-      uni.setStorageSync('myStudentId', id);
-      this.showTeamDialog = false;
-      uni.showToast({ title: '成功加入 ' + foundTeam + '！', icon: 'success' });
       // Link studentId to cloud record
-      wx.cloud.callFunction({ name: 'getSteps', data: { action: 'saveTeamMember', studentId: id } });
-      this.fetchTeamData();
+      wx.cloud.callFunction({
+        name: 'getSteps',
+        data: { action: 'saveTeamMember', studentId: id },
+        success: (res) => {
+          if (!res.result || !res.result.success) {
+            this.teamErrorMsg = (res.result && res.result.msg) || '加入失败，请重试';
+            return;
+          }
+          this.myTeam = foundTeam;
+          this.myStudentId = id;
+          this.selectedViewTeam = foundTeam;
+          uni.setStorageSync('myTeam', foundTeam);
+          uni.setStorageSync('myStudentId', id);
+          this.showTeamDialog = false;
+          uni.showToast({ title: '成功加入 ' + foundTeam + '！', icon: 'success' });
+          this.fetchTeamData();
+          this.fetchAllTeamRouteTotals(true);
+        },
+        fail: () => {
+          this.teamErrorMsg = '加入失败，请重试';
+        }
+      });
     },
     selectViewTeam(team) {
       this.selectedViewTeam = team;
@@ -1099,6 +1271,8 @@ export default {
           if (res.result && res.result.success) {
             this.teamMembers = res.result.members || [];
             this.teamTotalKm = res.result.totalKm || 0;
+            this.teamRouteTotals[teamName] = this.teamTotalKm;
+            this.fetchAllTeamRouteTotals(true);
           }
           this.teamLoading = false;
         },
@@ -1125,6 +1299,7 @@ export default {
             this.teamIdInput = '';
             this.teamErrorMsg = '';
             this.showTeamDialog = true;
+            this.drawTeamRouteOverlay();
           }
         }
       });
@@ -1148,9 +1323,12 @@ export default {
             uni.showToast({ title: '步数已更新！', icon: 'success' });
 
             if (that.activeTab === 'today') {
+              that.fetchAllTeamRouteTotals(true);
               that.initMapAndAnimate(oldSteps, that.todaysSteps);
             } else if (that.activeTab === 'period') {
               that.fetchLeaderboard();
+            } else if (that.activeTab === 'teams') {
+              that.fetchAllTeamRouteTotals(true);
             }
           } else {
             uni.showToast({ title: res.result.msg || '出错了，请重试', icon: 'none' });
@@ -1969,23 +2147,35 @@ page {
   background: rgba(255,255,255,0.05);
 }
 
-.team-member-mine {
-  background: rgba(245,215,110,0.12);
-  border: 1rpx solid rgba(245,215,110,0.3);
-}
-
 .tm-rank {
   width: 52rpx;
   font-size: 26rpx;
   font-weight: 700;
-  color: rgba(255,255,255,0.3);
+  color: #ffffff;
   text-align: center;
   flex-shrink: 0;
 }
 
-.tm-rank-gold   { color: #f5d76e; }
-.tm-rank-silver { color: #c0c0c0; }
-.tm-rank-bronze { color: #cd7f32; }
+.tm-rank-gold,
+.tm-rank-silver,
+.tm-rank-bronze {
+  color: #ffffff;
+}
+
+.tm-avatar-wrap {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 10rpx;
+  overflow: hidden;
+  margin: 0 18rpx 0 10rpx;
+  flex-shrink: 0;
+  background-color: rgba(255,255,255,0.1);
+}
+
+.tm-avatar {
+  width: 64rpx;
+  height: 64rpx;
+}
 
 .tm-info {
   flex: 1;

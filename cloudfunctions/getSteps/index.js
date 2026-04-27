@@ -83,6 +83,12 @@ exports.main = async (event, context) => {
     const { studentId } = event
     if (!studentId) return { success: false, msg: 'No studentId' }
 
+    const claimedRecord = await db.collection('userSteps').where({ studentId }).get()
+    const claimedByOther = claimedRecord.data.find(item => item._openid !== openid)
+    if (claimedByOther) {
+      return { success: false, msg: '该学工号已被其他用户绑定' }
+    }
+
     const userRecord = await db.collection('userSteps').where({ _openid: openid }).get()
     if (userRecord.data.length > 0) {
       await db.collection('userSteps').doc(userRecord.data[0]._id).update({
@@ -125,12 +131,28 @@ exports.main = async (event, context) => {
       return {
         studentId: m.studentId,
         nickname: m.nickname || m.studentId,
+        avatarUrl: m.avatarUrl || '',
         todaySteps: dailySteps[todayKey] || 0,
         cumulativeSteps,
         cumulativeKm: parseFloat((cumulativeSteps / STEPS_PER_KM).toFixed(1)),
         todayKm: parseFloat(((dailySteps[todayKey] || 0) / STEPS_PER_KM).toFixed(1)),
       }
     })
+
+    const cloudFileIds = members
+      .map(item => item.avatarUrl)
+      .filter(url => url && url.startsWith('cloud://'))
+
+    if (cloudFileIds.length > 0) {
+      try {
+        const tempRes = await cloud.getTempFileURL({ fileList: cloudFileIds })
+        const urlMap = {}
+        tempRes.fileList.forEach(f => { if (f.tempFileURL) urlMap[f.fileID] = f.tempFileURL })
+        members.forEach(item => {
+          item.avatarUrl = urlMap[item.avatarUrl] || item.avatarUrl
+        })
+      } catch (e) {}
+    }
 
     const totalKm = parseFloat(members.reduce((a, m) => a + m.cumulativeKm, 0).toFixed(1))
     return { success: true, members, totalKm }
@@ -158,6 +180,7 @@ exports.main = async (event, context) => {
 
       const todayDateKey = dateKey()
       const userRecord = await db.collection('userSteps').where({ _openid: openid }).get()
+      let totalSteps = todaySteps
 
       const updateData = {
         todaySteps,
@@ -171,7 +194,7 @@ exports.main = async (event, context) => {
       if (userRecord.data.length > 0) {
         const docId = userRecord.data[0]._id
         const existingDaily = userRecord.data[0].dailySteps || {}
-        const totalSteps = Object.values({ ...existingDaily, [todayDateKey]: todaySteps })
+        totalSteps = Object.values({ ...existingDaily, [todayDateKey]: todaySteps })
           .reduce((a, b) => a + b, 0)
         await db.collection('userSteps').doc(docId).update({
           data: { ...updateData, totalSteps }
@@ -195,7 +218,7 @@ exports.main = async (event, context) => {
         .count()
       const rank = rankRes.total + 1
 
-      return { success: true, todaySteps, rank }
+      return { success: true, todaySteps, totalSteps, rank }
     } catch (err) {
       console.error('syncSteps error:', err)
       return { success: false, error: err.message }
