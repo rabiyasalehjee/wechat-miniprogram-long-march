@@ -798,7 +798,7 @@ export default {
     },
     loadLocalData() {
       const savedSteps = uni.getStorageSync('totalStepsHistory');
-      if (savedSteps) {
+      if (savedSteps !== '' && savedSteps !== null && savedSteps !== undefined) {
         this.totalStepsHistory = parseInt(savedSteps, 10);
       }
       const today = new Date().toDateString();
@@ -1316,7 +1316,11 @@ export default {
             const oldSteps = that.todaysSteps;
             const isNewDay = that.todaysSteps === 0 && res.result.todaySteps > 0;
             that.todaysSteps = res.result.todaySteps;
-            that.totalStepsHistory = res.result.totalSteps || that.totalStepsHistory;
+            if (typeof res.result.totalSteps === 'number') {
+              that.totalStepsHistory = res.result.totalSteps;
+            } else {
+              that.totalStepsHistory = Math.max(0, that.totalStepsHistory - oldSteps + that.todaysSteps);
+            }
             if (res.result.rank) that.todayRank = res.result.rank;
             if (isNewDay) that.syncDays += 1;
             that.saveData();
