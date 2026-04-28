@@ -25,21 +25,6 @@
           id="redRouteOverlayCanvas"
           class="red-route-overlay-canvas"
         ></canvas>
-        <view class="route-grid-overlay">
-          <view
-            v-for="row in 20"
-            :key="'grid-row-' + row"
-            class="route-grid-row"
-          >
-            <view
-              v-for="col in 20"
-              :key="'grid-cell-' + row + '-' + col"
-              class="route-grid-cell"
-            >
-              <text class="route-grid-label">{{ gridCoord(col) }},{{ gridCoord(row) }}</text>
-            </view>
-          </view>
-        </view>
       </view>
 
       <!-- this section was the main section display route code that has been set to display none -->
@@ -522,9 +507,6 @@ export default {
     }
   },
   methods: {
-    gridCoord(index) {
-      return ((index - 0.5) / 20).toFixed(3);
-    },
     initMapAndAnimate(startSteps, targetSteps) {
       if (this.mapWidth && this.mapHeight) {
         this.animateMapProgress(startSteps, targetSteps);
@@ -959,7 +941,7 @@ export default {
               p(27, 52), p(20, 58), p(11, 59), p(20, 50), p(35, 53),
               p(46, 45), p(34, 38), p(22, 44), p(13, 38), p(19, 30),
               p(10, 31), p(20, 22), p(36, 25), p(49, 18),
-              p(42, 11), p(55, 8)
+              p(42, 11)
             ],
             Team3: [
               p(58, 89), p(49, 85), p(39, 87), p(30, 82), p(20, 81),
@@ -1018,20 +1000,27 @@ export default {
         };
         const drawPath = (points, strokeWidth, color) => {
           if (!points.length) return;
-          ctx.beginPath();
-          ctx.moveTo(points[0].x, points[0].y);
-          for (let i = 1; i < points.length; i++) {
-            const prev = points[i - 1];
-            const cur = points[i];
-            const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -6 : 6);
-            const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 5 : -4);
-            ctx.quadraticCurveTo(cx, cy, cur.x, cur.y);
-          }
-          ctx.setStrokeStyle(color);
+          const trace = (offsetX, offsetY) => {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x + offsetX, points[0].y + offsetY);
+            for (let i = 1; i < points.length; i++) {
+              const prev = points[i - 1];
+              const cur = points[i];
+              const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -6 : 6) + offsetX;
+              const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 5 : -4) + offsetY;
+              ctx.quadraticCurveTo(cx, cy, cur.x + offsetX, cur.y + offsetY);
+            }
+            ctx.setStrokeStyle(color);
+            ctx.setLineCap('round');
+            ctx.setLineJoin('round');
+            ctx.stroke();
+          };
+          if (ctx.setGlobalAlpha) ctx.setGlobalAlpha(0.45);
+          ctx.setLineWidth(strokeWidth * 0.65);
+          trace(1.2, -0.8);
+          if (ctx.setGlobalAlpha) ctx.setGlobalAlpha(1);
           ctx.setLineWidth(strokeWidth);
-          ctx.setLineCap('round');
-          ctx.setLineJoin('round');
-          ctx.stroke();
+          trace(0, 0);
         };
         const drawRouteDot = (point, color) => {
           ctx.beginPath();
@@ -1060,7 +1049,7 @@ export default {
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
           const alpha = !this.myTeam || isMine ? 0.95 : 0.32;
-          const teamProgress = team === 'Team2' ? 1 : (progressByTeam[team] || 0);
+          const teamProgress = progressByTeam[team] || 0;
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
           const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : [4, 9, 14, 19];
@@ -1502,42 +1491,6 @@ page {
   height: 100%;
   z-index: 2;
   pointer-events: none;
-}
-
-.route-grid-overlay {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 3;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-}
-
-.route-grid-row {
-  flex: 1;
-  display: flex;
-}
-
-.route-grid-cell {
-  flex: 1;
-  border-right: 1rpx solid rgba(0, 0, 0, 0.42);
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.42);
-  box-sizing: border-box;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 1rpx;
-}
-
-.route-grid-label {
-  font-size: 10rpx;
-  line-height: 1;
-  color: #000000;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.62);
 }
 
 /* this section was the main section display route code that has been set to display none */
