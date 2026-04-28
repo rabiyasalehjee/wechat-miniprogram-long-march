@@ -40,6 +40,17 @@ function decryptWeRunData(sessionKey, encryptedData, iv) {
   return JSON.parse(decoded)
 }
 
+function normalizeStudentId(studentId) {
+  return String(studentId || '').trim().toUpperCase()
+}
+
+async function findStudentOwner(studentId) {
+  const normalized = normalizeStudentId(studentId)
+  if (!normalized) return null
+  const res = await db.collection('userSteps').get()
+  return res.data.find(item => normalizeStudentId(item.studentId) === normalized) || null
+}
+
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext()
   const openid = wxContext.OPENID
@@ -80,12 +91,11 @@ exports.main = async (event, context) => {
 
   // ── Link student ID to this user ──
   if (event.action === 'saveTeamMember') {
-    const { studentId } = event
+    const studentId = normalizeStudentId(event.studentId)
     if (!studentId) return { success: false, msg: 'No studentId' }
 
-    const claimedRecord = await db.collection('userSteps').where({ studentId }).get()
-    const claimedByOther = claimedRecord.data.find(item => item._openid !== openid)
-    if (claimedByOther) {
+    const claimedByOther = await findStudentOwner(studentId)
+    if (claimedByOther && claimedByOther._openid !== openid) {
       return { success: false, msg: '该学工号已被其他用户绑定' }
     }
 
@@ -118,18 +128,18 @@ exports.main = async (event, context) => {
     const { teamName } = event
     const memberIds = TEAM_DATA[teamName]
     if (!memberIds) return { success: false, msg: 'Unknown team' }
+    const normalizedMemberIds = memberIds.map(normalizeStudentId)
 
-    const res = await db.collection('userSteps')
-      .where({ studentId: _.in(memberIds) })
-      .limit(100)
-      .get()
+    const res = await db.collection('userSteps').limit(1000).get()
 
-    const members = res.data.map(m => {
+    const members = res.data
+      .filter(m => normalizedMemberIds.includes(normalizeStudentId(m.studentId)))
+      .map(m => {
       const dailySteps = m.dailySteps || {}
       const cumulativeSteps = Object.values(dailySteps).reduce((a, b) => a + b, 0)
       const todayKey = dateKey()
       return {
-        studentId: m.studentId,
+        studentId: normalizeStudentId(m.studentId),
         nickname: m.nickname || m.studentId,
         avatarUrl: m.avatarUrl || '',
         todaySteps: dailySteps[todayKey] || 0,
@@ -189,7 +199,14 @@ exports.main = async (event, context) => {
         avatarUrl: avatarUrl || '',
         [`dailySteps.${todayDateKey}`]: todaySteps,
       }
-      if (studentId) updateData.studentId = studentId
+      if (studentId) {
+        const normalizedStudentId = normalizeStudentId(studentId)
+        const claimedByOther = await findStudentOwner(normalizedStudentId)
+        if (claimedByOther && claimedByOther._openid !== openid) {
+          return { success: false, msg: '该学工号已被其他用户绑定' }
+        }
+        updateData.studentId = normalizedStudentId
+      }
 
       if (userRecord.data.length > 0) {
         const docId = userRecord.data[0]._id

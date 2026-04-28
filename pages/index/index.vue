@@ -152,10 +152,13 @@
             <text class="team-header-name">{{ teamChineseName[selectedViewTeam] || selectedViewTeam }}</text>
             <text class="team-header-sub">活动周期：2026.05.04 — 2026.10.22</text>
           </view>
-          <view class="team-header-stat">
-            <text class="team-total-km">{{ teamTotalKm }}</text>
-            <text class="team-total-km-unit">公里</text>
-            <text class="team-total-km-label">团队总里程</text>
+          <view class="team-header-actions">
+            <view class="team-header-stat">
+              <text class="team-total-km">{{ teamTotalKm }}</text>
+              <text class="team-total-km-unit">公里</text>
+              <text class="team-total-km-label">团队总里程</text>
+            </view>
+            <button v-if="myTeam" class="team-leave-btn" @click="leaveTeam">退出团队</button>
           </view>
         </view>
 
@@ -1121,8 +1124,8 @@ export default {
           const routePoints = getTeamRoutePoints(team);
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
-          const alpha = team === 'Team3' ? 1 : (!this.myTeam || isMine ? 0.95 : 0.32);
-          const teamProgress = team === 'Team3' ? 1 : (progressByTeam[team] || 0);
+          const alpha = !this.myTeam || isMine ? 0.95 : 0.32;
+          const teamProgress = progressByTeam[team] || 0;
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
           const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [18, 44, 70, 96, 122] : (team === 'Team3' ? [16, 40, 64, 88, 112] : [4, 9, 14, 19]));
@@ -1157,8 +1160,9 @@ export default {
     },
     leaderboardTeamName(item) {
       if (!item || !item.studentId) return '';
+      const targetId = String(item.studentId).toUpperCase();
       for (const [team, ids] of Object.entries(this.teamData)) {
-        if (ids.includes(item.studentId)) {
+        if (ids.map(id => id.toUpperCase()).includes(targetId)) {
           return this.teamChineseName[team] || '';
         }
       }
@@ -1306,11 +1310,11 @@ export default {
       this.teamErrorMsg = '';
     },
     submitTeamId() {
-      const id = this.teamIdInput.trim();
+      const id = this.teamIdInput.trim().toUpperCase();
       if (!id) { this.teamErrorMsg = '请输入学工号'; return; }
       let foundTeam = '';
       for (const [team, ids] of Object.entries(this.teamData)) {
-        if (ids.includes(id)) { foundTeam = team; break; }
+        if (ids.map(item => item.toUpperCase()).includes(id)) { foundTeam = team; break; }
       }
       if (!foundTeam) {
         this.teamErrorMsg = '未找到该学工号，请确认后重新输入';
@@ -2141,6 +2145,13 @@ page {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+}
+
+.team-header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16rpx;
 }
 
 .team-total-km {
