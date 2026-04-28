@@ -25,6 +25,21 @@
           id="redRouteOverlayCanvas"
           class="red-route-overlay-canvas"
         ></canvas>
+        <view class="route-grid-overlay">
+          <view
+            v-for="row in 20"
+            :key="'grid-row-' + row"
+            class="route-grid-row"
+          >
+            <view
+              v-for="col in 20"
+              :key="'grid-cell-' + row + '-' + col"
+              class="route-grid-cell"
+            >
+              <text class="route-grid-label">{{ gridCoord(col) }},{{ gridCoord(row) }}</text>
+            </view>
+          </view>
+        </view>
       </view>
 
       <!-- this section was the main section display route code that has been set to display none -->
@@ -507,6 +522,9 @@ export default {
     }
   },
   methods: {
+    gridCoord(index) {
+      return ((index - 0.5) / 20).toFixed(3);
+    },
     initMapAndAnimate(startSteps, targetSteps) {
       if (this.mapWidth && this.mapHeight) {
         this.animateMapProgress(startSteps, targetSteps);
@@ -915,6 +933,7 @@ export default {
         const height = rect.height;
         const ctx = uni.createCanvasContext('redRouteOverlayCanvas', this);
         const p = (x, y) => ({ x: (x / 100) * width, y: (y / 100) * height });
+        const px = (x, y, dx = 0, dy = 0) => ({ x: (x / 100) * width + dx, y: (y / 100) * height + dy });
         const rgba = (hex, alpha) => {
           const raw = hex.replace('#', '');
           const r = parseInt(raw.slice(0, 2), 16);
@@ -932,11 +951,15 @@ export default {
               p(59, 16)
             ],
             Team2: [
-              p(45, 94), p(35, 91), p(25, 88), p(14, 90), p(7, 82),
-              p(13, 75), p(23, 73), p(17, 66), p(9, 59), p(17, 53),
-              p(28, 55), p(36, 49), p(28, 43), p(19, 44), p(11, 37),
-              p(20, 31), p(31, 33), p(42, 28), p(35, 21), p(45, 18),
-              p(53, 20)
+              px(37.5, 77.5, 100), px(43, 72, 100), px(48, 80, 100), px(40, 86, 100),
+              px(32, 79, 100), px(39, 70, 100), px(50, 75, 100), p(34, 86), p(25, 92), p(13, 96), p(5, 90),
+              p(12, 84), p(24, 88), p(34, 82), p(44, 75), p(39, 80),
+              p(31, 78), p(27, 82), p(20, 78), p(12, 84), p(6, 78),
+              p(13, 71), p(24, 66), p(12, 62), p(6, 54), p(15, 48),
+              p(27, 52), p(20, 58), p(11, 59), p(20, 50), p(35, 53),
+              p(46, 45), p(34, 38), p(22, 44), p(13, 38), p(19, 30),
+              p(10, 31), p(20, 22), p(36, 25), p(49, 18),
+              p(42, 11), p(55, 8)
             ],
             Team3: [
               p(58, 89), p(49, 85), p(39, 87), p(30, 82), p(20, 81),
@@ -1000,8 +1023,8 @@ export default {
           for (let i = 1; i < points.length; i++) {
             const prev = points[i - 1];
             const cur = points[i];
-            const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -10 : 10);
-            const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 8 : -6);
+            const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -6 : 6);
+            const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 5 : -4);
             ctx.quadraticCurveTo(cx, cy, cur.x, cur.y);
           }
           ctx.setStrokeStyle(color);
@@ -1037,10 +1060,11 @@ export default {
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
           const alpha = !this.myTeam || isMine ? 0.95 : 0.32;
-          const teamProgress = progressByTeam[team] || 0;
+          const teamProgress = team === 'Team2' ? 1 : (progressByTeam[team] || 0);
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
-          [4, 9, 14, 19].forEach(i => {
+          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : [4, 9, 14, 19];
+          routeDotIndexes.forEach(i => {
             const dotIsFilled = teamProgress >= progressAtPoint(routePoints, i);
             drawRouteDot(routePoints[i], dotIsFilled ? rgba(teamColor, alpha) : 'rgba(92, 92, 92, 0.65)');
           });
@@ -1478,6 +1502,42 @@ page {
   height: 100%;
   z-index: 2;
   pointer-events: none;
+}
+
+.route-grid-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.route-grid-row {
+  flex: 1;
+  display: flex;
+}
+
+.route-grid-cell {
+  flex: 1;
+  border-right: 1rpx solid rgba(0, 0, 0, 0.42);
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.42);
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 1rpx;
+}
+
+.route-grid-label {
+  font-size: 10rpx;
+  line-height: 1;
+  color: #000000;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.62);
 }
 
 /* this section was the main section display route code that has been set to display none */
