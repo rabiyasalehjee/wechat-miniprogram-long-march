@@ -384,9 +384,9 @@ export default {
         'Team1': '红25军', 'Team2': '红二方面军', 'Team3': '红四方面军', 'Team4': '红一方面军'
       },
       teamColors: {
-        'Team1': { primary: '#c0392b', light: 'rgba(192,57,43,0.15)', name: '红25军' },
+        'Team1': { primary: '#FF2500', light: 'rgba(255,37,0,0.15)', name: '红25军' },
         'Team2': { primary: '#F5D327', light: 'rgba(245,211,39,0.15)', name: '红二方面军' },
-        'Team3': { primary: '#2980b9', light: 'rgba(41,128,185,0.15)', name: '红四方面军' },
+        'Team3': { primary: '#00084A', light: 'rgba(0,8,74,0.15)', name: '红四方面军' },
         'Team4': { primary: '#27ae60', light: 'rgba(39,174,96,0.15)', name: '红一方面军' }
       },
       teamData: {
@@ -926,11 +926,39 @@ export default {
         const getTeamRoutePoints = team => {
           const routes = {
             Team1: [
-              p(51, 91), p(42, 88), p(31, 90), p(20, 86), p(13, 78),
-              p(18, 70), p(29, 69), p(23, 61), p(14, 55), p(21, 48),
-              p(33, 50), p(42, 44), p(35, 37), p(24, 38), p(16, 31),
-              p(24, 24), p(36, 26), p(47, 21), p(42, 15), p(53, 13),
-              p(59, 16)
+              p(54.9, 22.8), p(53.6, 20.4), p(51.6, 18.7), p(49.0, 18.0),
+              p(47.0, 18.3), p(46.0, 19.3), p(45.7, 21.4), p(45.7, 21.5),
+              p(45.7, 21.8), p(45.7, 22.9), p(45.5, 24.1), p(44.9, 24.8),
+              p(43.8, 25.1), p(43.7, 25.1), p(43.0, 25.1), p(41.2, 25.3),
+              p(39.3, 25.8), p(37.5, 26.8), p(35.9, 28.4), p(35.8, 28.5),
+              p(35.0, 29.3), p(33.0, 31.6), p(32.4, 32.8), p(32.3, 34.1),
+              p(32.5, 35.5), p(32.4, 36.8), p(31.7, 37.8), p(30.6, 38.4),
+              p(30.4, 38.5), p(29.2, 38.9), p(26.0, 40.3), p(25.1, 40.9),
+              p(24.6, 41.6), p(24.4, 42.8), p(24.4, 43.0), p(24.2, 44.4),
+              p(23.8, 48.1), p(23.4, 50.1), p(22.6, 51.6), p(21.4, 52.9),
+              p(21.4, 52.9), p(21.1, 53.1), p(20.5, 53.7), p(19.9, 54.5),
+              p(19.8, 55.3), p(19.9, 56.3), p(20.0, 56.4), p(20.4, 57.4),
+              p(21.4, 60.1), p(21.7, 61.7), p(21.3, 63.2), p(20.4, 64.5),
+              p(20.3, 64.6), p(19.9, 65.0), p(18.8, 66.1), p(17.7, 67.7),
+              p(17.1, 69.5), p(16.9, 71.6), p(16.9, 72.0), p(16.9, 74.5),
+              p(16.9, 81.4), p(16.9, 83.8), p(16.6, 85.6), p(16.0, 87.2),
+              p(15.9, 88.0), p(16.2, 88.7), p(16.9, 89.1), p(17.9, 89.8),
+              p(18.5, 90.8), p(18.6, 92.1), p(19.0, 93.6), p(20.4, 94.5),
+              p(22.6, 94.9), p(26.1, 94.6), p(29.5, 93.6), p(32.9, 91.9),
+              p(35.7, 89.9), p(38.3, 87.3), p(40.3, 84.2), p(41.3, 81.6),
+              p(41.5, 78.8), p(40.9, 76.3), p(39.7, 75.0), p(38.0, 74.7),
+              p(35.8, 75.2), p(35.7, 75.2), p(34.7, 75.6), p(32.2, 76.4),
+              p(32.4, 76.4), p(33.9, 76.6), p(38.1, 77.2), p(38.2, 77.1),
+              p(38.5, 76.8), p(39.2, 75.8), p(39.3, 75.9), p(39.5, 76.3),
+              p(40.3, 77.5), p(40.3, 77.5), p(40.0, 78.0), p(39.2, 79.4),
+              p(39.3, 79.4), p(39.8, 79.7), p(41.2, 80.6), p(41.3, 80.5),
+              p(42.0, 80.1), p(43.6, 78.9), p(43.7, 79.0), p(44.3, 79.3),
+              p(46.0, 80.2), p(46.0, 80.3), p(46.3, 81.0), p(47.1, 82.9),
+              p(47.2, 82.9), p(47.9, 82.8), p(49.7, 82.8), p(49.8, 82.7),
+              p(50.3, 82.1), p(51.6, 80.7), p(53.9, 79.8), p(56.5, 80.5),
+              p(59.1, 82.3), p(59.2, 82.5), p(60.1, 83.3), p(62.6, 85.6),
+              p(66.0, 88.3), p(69.6, 90.2), p(73.5, 91.4), p(78.1, 92.1),
+              p(82.7, 92.9), p(87.4, 94.4)
             ],
             Team2: [
               px(37.5, 77.5, 100), px(43, 72, 100), px(48, 80, 100), px(40, 86, 100),
@@ -944,11 +972,38 @@ export default {
               p(42, 11)
             ],
             Team3: [
-              p(58, 89), p(49, 85), p(39, 87), p(30, 82), p(20, 81),
-              p(15, 73), p(25, 69), p(36, 71), p(31, 62), p(21, 58),
-              p(28, 50), p(40, 52), p(49, 46), p(41, 39), p(31, 40),
-              p(23, 33), p(33, 27), p(45, 29), p(54, 23), p(49, 17),
-              p(59, 13)
+              p(66.7, 71.4), p(67.8, 73.2), p(68.3, 75.0), p(68.1, 76.7),
+              p(67.1, 78.3), p(66.5, 79.3), p(66.6, 80.3), p(67.1, 81.4),
+              p(67.8, 82.7), p(68.2, 84.3), p(67.7, 85.7), p(66.5, 86.8),
+              p(64.7, 87.5), p(62.5, 87.4), p(60.6, 86.5), p(58.7, 85.3),
+              p(57.0, 84.0), p(55.0, 83.0), p(53.1, 82.7), p(51.2, 83.2),
+              p(49.2, 84.4), p(47.9, 85.8), p(47.2, 87.2), p(47.4, 88.6),
+              p(48.4, 89.8), p(45.5, 89.7), p(42.4, 89.2), p(39.4, 88.4),
+              p(36.4, 87.5), p(35.0, 86.6), p(34.2, 85.3), p(34.1, 83.9),
+              p(34.9, 82.2), p(33.1, 83.5), p(32.2, 85.3), p(32.2, 87.4),
+              p(32.9, 89.6), p(30.6, 90.2), p(27.7, 90.4), p(24.4, 90.5),
+              p(20.9, 90.3), p(18.2, 90.1), p(15.7, 89.7), p(13.5, 89.2),
+              p(11.6, 88.3), p(10.9, 87.5), p(10.6, 86.3), p(10.3, 84.9),
+              p(9.7, 83.6), p(8.8, 82.4), p(8.1, 81.3), p(7.7, 80.0),
+              p(7.8, 78.3), p(7.7, 76.4), p(7.0, 74.6), p(6.2, 72.6),
+              p(5.6, 70.5), p(5.3, 67.6), p(5.7, 64.8), p(6.6, 62.2),
+              p(8.1, 60.1), p(9.0, 58.4), p(9.3, 56.1), p(9.2, 53.6),
+              p(8.9, 50.9), p(9.0, 49.4), p(9.5, 48.0), p(10.4, 46.8),
+              p(11.6, 45.7), p(14.9, 43.6), p(18.3, 41.5), p(21.7, 39.4),
+              p(25.2, 37.4), p(29.0, 35.3), p(32.7, 33.4), p(36.2, 31.7),
+              p(39.5, 30.5), p(41.5, 30.2), p(43.3, 30.6), p(45.0, 31.4),
+              p(46.5, 32.6), p(47.7, 33.9), p(48.9, 34.9), p(50.3, 35.6),
+              p(51.9, 36.1), p(51.1, 33.8), p(50.1, 31.6), p(49.2, 29.4),
+              p(48.1, 27.4), p(47.8, 26.5), p(48.2, 25.8), p(48.9, 25.6),
+              p(50.0, 26.1), p(51.3, 27.3), p(52.5, 28.5), p(53.8, 29.6),
+              p(55.0, 30.6), p(56.5, 31.4), p(57.9, 31.5), p(59.4, 31.2),
+              p(60.9, 30.3), p(62.2, 28.9), p(63.4, 27.4), p(64.6, 25.8),
+              p(65.9, 24.4), p(67.4, 23.5), p(68.7, 23.5), p(69.8, 24.5),
+              p(70.5, 26.1), p(71.3, 27.9), p(72.3, 29.2), p(73.6, 30.0),
+              p(75.2, 30.0), p(76.8, 29.4), p(78.1, 28.2), p(79.1, 26.7),
+              p(79.8, 24.8), p(80.7, 23.4), p(81.9, 23.0), p(83.4, 23.5),
+              p(84.9, 24.8), p(86.6, 26.4), p(88.4, 27.4), p(90.3, 27.7),
+              p(92.2, 27.4)
             ],
             Team4: [
               p(56, 95), p(47, 93), p(37, 90), p(28, 92), p(19, 85),
@@ -1003,12 +1058,32 @@ export default {
           const trace = (offsetX, offsetY) => {
             ctx.beginPath();
             ctx.moveTo(points[0].x + offsetX, points[0].y + offsetY);
-            for (let i = 1; i < points.length; i++) {
-              const prev = points[i - 1];
-              const cur = points[i];
-              const cx = (prev.x + cur.x) / 2 + (i % 2 === 0 ? -6 : 6) + offsetX;
-              const cy = (prev.y + cur.y) / 2 + (i % 3 === 0 ? 5 : -4) + offsetY;
-              ctx.quadraticCurveTo(cx, cy, cur.x + offsetX, cur.y + offsetY);
+            if (points.length === 2) {
+              ctx.lineTo(points[1].x + offsetX, points[1].y + offsetY);
+            } else {
+              for (let i = 1; i < points.length; i++) {
+                if (i === points.length - 1) {
+                  ctx.lineTo(points[i].x + offsetX, points[i].y + offsetY);
+                  break;
+                }
+                const prev = points[i - 1];
+                const cur = points[i];
+                const next = points[i + 1];
+                const radius = 5;
+                const inLen = Math.sqrt(Math.pow(cur.x - prev.x, 2) + Math.pow(cur.y - prev.y, 2)) || 1;
+                const outLen = Math.sqrt(Math.pow(next.x - cur.x, 2) + Math.pow(next.y - cur.y, 2)) || 1;
+                const corner = Math.min(radius, inLen * 0.35, outLen * 0.35);
+                const before = {
+                  x: cur.x - ((cur.x - prev.x) / inLen) * corner,
+                  y: cur.y - ((cur.y - prev.y) / inLen) * corner
+                };
+                const after = {
+                  x: cur.x + ((next.x - cur.x) / outLen) * corner,
+                  y: cur.y + ((next.y - cur.y) / outLen) * corner
+                };
+                ctx.lineTo(before.x + offsetX, before.y + offsetY);
+                ctx.quadraticCurveTo(cur.x + offsetX, cur.y + offsetY, after.x + offsetX, after.y + offsetY);
+              }
             }
             ctx.setStrokeStyle(color);
             ctx.setLineCap('round');
@@ -1023,6 +1098,7 @@ export default {
           trace(0, 0);
         };
         const drawRouteDot = (point, color) => {
+          if (!point) return;
           ctx.beginPath();
           ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
           ctx.setFillStyle(color);
@@ -1048,12 +1124,13 @@ export default {
           const routePoints = getTeamRoutePoints(team);
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
-          const alpha = !this.myTeam || isMine ? 0.95 : 0.32;
-          const teamProgress = progressByTeam[team] || 0;
+          const alpha = team === 'Team1' ? 1 : (!this.myTeam || isMine ? 0.95 : 0.32);
+          const teamProgress = team === 'Team1' ? 1 : (progressByTeam[team] || 0);
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
-          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : [4, 9, 14, 19];
+          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [18, 44, 70, 96, 122] : [4, 9, 14, 19]);
           routeDotIndexes.forEach(i => {
+            if (!routePoints[i]) return;
             const dotIsFilled = teamProgress >= progressAtPoint(routePoints, i);
             drawRouteDot(routePoints[i], dotIsFilled ? rgba(teamColor, alpha) : 'rgba(92, 92, 92, 0.65)');
           });
