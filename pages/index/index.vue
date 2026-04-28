@@ -998,12 +998,8 @@ export default {
               p(50.0, 26.1), p(51.3, 27.3), p(52.5, 28.5), p(53.8, 29.6),
               p(55.0, 30.6), p(56.5, 31.4), p(57.9, 31.5), p(59.4, 31.2),
               p(60.9, 30.3), p(62.2, 28.9), p(63.4, 27.4), p(64.6, 25.8),
-              p(65.9, 24.4), p(67.4, 23.5), p(68.7, 23.5), p(69.8, 24.5),
-              p(70.5, 26.1), p(71.3, 27.9), p(72.3, 29.2), p(73.6, 30.0),
-              p(75.2, 30.0), p(76.8, 29.4), p(78.1, 28.2), p(79.1, 26.7),
-              p(79.8, 24.8), p(80.7, 23.4), p(81.9, 23.0), p(83.4, 23.5),
-              p(84.9, 24.8), p(86.6, 26.4), p(88.4, 27.4), p(90.3, 27.7),
-              p(92.2, 27.4)
+              p(65.8, 24.3), p(66.8, 23.1), p(67.4, 22.1), p(66.0, 21.4),
+              p(64.2, 20.8), p(62.2, 20.3), p(60.4, 20.0), p(59.8, 20.0)
             ],
             Team4: [
               p(56, 95), p(47, 93), p(37, 90), p(28, 92), p(19, 85),
@@ -1013,6 +1009,7 @@ export default {
               p(62, 12)
             ]
           };
+          if (team === 'Team1') return routes.Team1.slice().reverse();
           return routes[team] || routes.Team1;
         };
         const pointAtProgress = (points, progress) => {
@@ -1124,11 +1121,11 @@ export default {
           const routePoints = getTeamRoutePoints(team);
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
-          const alpha = team === 'Team1' ? 1 : (!this.myTeam || isMine ? 0.95 : 0.32);
-          const teamProgress = team === 'Team1' ? 1 : (progressByTeam[team] || 0);
+          const alpha = team === 'Team3' ? 1 : (!this.myTeam || isMine ? 0.95 : 0.32);
+          const teamProgress = team === 'Team3' ? 1 : (progressByTeam[team] || 0);
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
-          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [18, 44, 70, 96, 122] : [4, 9, 14, 19]);
+          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [18, 44, 70, 96, 122] : (team === 'Team3' ? [16, 40, 64, 88, 112] : [4, 9, 14, 19]));
           routeDotIndexes.forEach(i => {
             if (!routePoints[i]) return;
             const dotIsFilled = teamProgress >= progressAtPoint(routePoints, i);
