@@ -22,7 +22,7 @@
     <!-- Tab 1: 今日榜单 -->
     <view v-show="activeTab === 'today'" class="tab1-wrapper">
       <view class="map-image-section">
-        <image class="map-image" src="/static/map-img.png" mode="aspectFill" />
+        <image class="map-image" src="/static/map-img.jpg" mode="aspectFill" />
         <canvas
           canvas-id="redRouteOverlayCanvas"
           id="redRouteOverlayCanvas"
