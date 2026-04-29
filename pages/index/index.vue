@@ -8,7 +8,7 @@
     <!-- Top Nav Bar (hidden on teams tab) -->
     <view v-if="activeTab !== 'teams' && activeTab !== 'profile'" class="top-nav">
       <view class="nav-left">
-        <view class="nav-row-1">
+        <view class="nav-row-1 nav-row-hidden">
           <text class="nav-yellow">今日步数：{{ todaysSteps }}</text>
           <text class="nav-yellow nav-gap">今日排名：{{ todayRank }}</text>
         </view>
@@ -1128,7 +1128,7 @@ export default {
               p(87.4, 94.4)
             ]
           };
-          if (team === 'Team1') return routes.Team1.map(pt => ({ x: pt.x + 24, y: pt.y }));
+          if (team === 'Team1') return routes.Team1.slice().reverse().map(pt => ({ x: pt.x + 24, y: pt.y }));
           if (team === 'Team3') return routes.Team3.slice().reverse();
           if (team === 'Team4') return routes.Team4.slice().reverse();
           return routes[team] || routes.Team1;
@@ -1320,6 +1320,60 @@ export default {
       this.tempNickname = this.userNickname || (uni.getStorageSync('userProfile') || {}).nickname || '';
       this.tempAvatarUrl = this.userAvatarUrl || (uni.getStorageSync('userProfile') || {}).avatarUrl || '';
     },
+    applyProfileUpdateToVisibleData(nickname, avatarUrl, previousNickname = '', previousAvatar = '') {
+      const safeNickname = String(nickname || '').trim();
+      const safeAvatar = String(avatarUrl || '').trim();
+      this.userNickname = safeNickname;
+      this.userAvatarUrl = safeAvatar;
+
+      const cachedProfile = { nickname: safeNickname, avatarUrl: safeAvatar };
+      uni.setStorageSync('userProfile', cachedProfile);
+
+      const studentId = String(this.myStudentId || '').trim().toUpperCase();
+      if (studentId) {
+        this.teamMembers = (this.teamMembers || []).map((member) => {
+          if (String(member.studentId || '').trim().toUpperCase() !== studentId) return member;
+          return {
+            ...member,
+            nickname: safeNickname,
+            avatarUrl: safeAvatar
+          };
+        });
+
+        this.leaderboard = (this.leaderboard || []).map((item) => {
+          if (String(item.studentId || '').trim().toUpperCase() !== studentId) return item;
+          return {
+            ...item,
+            nickname: safeNickname,
+            avatarUrl: safeAvatar
+          };
+        });
+      } else {
+        const prevName = String(previousNickname || '').trim();
+        const prevAvatarSafe = String(previousAvatar || '').trim();
+        if (prevName || prevAvatarSafe) {
+          this.leaderboard = (this.leaderboard || []).map((item) => {
+            const itemName = String(item.nickname || '').trim();
+            const itemAvatar = String(item.avatarUrl || '').trim();
+            if (prevName && itemName === prevName) {
+              return {
+                ...item,
+                nickname: safeNickname,
+                avatarUrl: safeAvatar
+              };
+            }
+            if (prevAvatarSafe && itemAvatar === prevAvatarSafe) {
+              return {
+                ...item,
+                nickname: safeNickname,
+                avatarUrl: safeAvatar
+              };
+            }
+            return item;
+          });
+        }
+      }
+    },
     savePersonalProfile() {
       const name = (this.tempNickname || '').trim();
       if (!name) {
@@ -1370,21 +1424,25 @@ export default {
     },
     _saveProfileToCloud(nickname, avatarUrl) {
       const safeAvatar = (avatarUrl || '').startsWith('cloud://') ? avatarUrl : '';
-      this.userNickname = nickname;
-      this.userAvatarUrl = avatarUrl || '';
-      uni.setStorageSync('userProfile', { nickname, avatarUrl: avatarUrl || '' });
+      const previousNickname = this.userNickname;
+      const previousAvatar = this.userAvatarUrl;
+      this.applyProfileUpdateToVisibleData(nickname, avatarUrl || '', previousNickname, previousAvatar);
       wx.cloud.callFunction({
         name: 'getSteps',
         data: { action: 'updateProfile', nickname, avatarUrl: safeAvatar },
-        complete: () => {
-          uni.hideLoading();
+        success: () => {
+          if (this.myTeam) this.fetchTeamData();
+          this.fetchLeaderboard();
           this.personalEditMode = false;
           this.previousTab = 'profile';
           this.tempNickname = nickname;
           this.tempAvatarUrl = avatarUrl || '';
-          if (this.myTeam) this.fetchTeamData();
-          this.fetchLeaderboard();
+          uni.hideLoading();
           uni.showToast({ title: '资料已更新', icon: 'success' });
+        },
+        fail: () => {
+          uni.hideLoading();
+          uni.showToast({ title: '保存失败，请重试', icon: 'none' });
         }
       });
     },
@@ -1734,10 +1792,15 @@ page {
   margin-bottom: 10rpx;
 }
 
+.nav-row-hidden {
+  display: none;
+}
+
 .nav-row-2 {
   display: flex;
   flex-direction: row;
   align-items: center;
+  min-height: 78rpx;
 }
 
 .nav-yellow {
@@ -1753,6 +1816,7 @@ page {
 .nav-hint {
   font-size: 24rpx;
   color: #ffffff;
+  line-height: 1.2;
 }
 
 .sync-btn {
