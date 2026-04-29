@@ -25,6 +25,10 @@
           id="redRouteOverlayCanvas"
           class="red-route-overlay-canvas"
         ></canvas>
+        <view v-if="mapLoading" class="map-loading-overlay">
+          <view class="map-loading-spinner"></view>
+          <text class="map-loading-text">地图加载中...</text>
+        </view>
       </view>
 
       <!-- this section was the main section display route code that has been set to display none -->
@@ -383,6 +387,10 @@ export default {
       teamLoading: false,
       teamRouteTotals: { Team1: 0, Team2: 0, Team3: 0, Team4: 0 },
       teamRouteProgress: { Team1: 0, Team2: 0, Team3: 0, Team4: 0 },
+      mapLoading: true,
+      mapRenderReady: { route: false, overlay: false },
+      mapLoadingTimer: null,
+      mapHasLoadedOnce: false,
       teamChineseName: {
         'Team1': '红25军', 'Team2': '红二方面军', 'Team3': '红四方面军', 'Team4': '红一方面军'
       },
@@ -501,6 +509,7 @@ export default {
     
     // Draw the map path if starting on today tab
     if (this.activeTab === 'today') {
+      this.resetMapLoading();
       this.$nextTick(() => {
         setTimeout(() => {
           this.fetchAllTeamRouteTotals(false);
@@ -509,7 +518,38 @@ export default {
       });
     }
   },
+  beforeDestroy() {
+    if (this.mapLoadingTimer) {
+      clearTimeout(this.mapLoadingTimer);
+      this.mapLoadingTimer = null;
+    }
+  },
   methods: {
+    resetMapLoading() {
+      if (this.mapLoadingTimer) {
+        clearTimeout(this.mapLoadingTimer);
+        this.mapLoadingTimer = null;
+      }
+      this.mapLoading = true;
+      this.mapRenderReady = { route: false, overlay: false };
+      this.mapLoadingTimer = setTimeout(() => {
+        if (this.mapLoading) {
+          this.mapLoading = false;
+        }
+      }, 6000);
+    },
+    markMapPieceReady(piece) {
+      if (!piece) return;
+      this.mapRenderReady[piece] = true;
+      if (this.mapRenderReady.route && this.mapRenderReady.overlay) {
+        this.mapLoading = false;
+        this.mapHasLoadedOnce = true;
+        if (this.mapLoadingTimer) {
+          clearTimeout(this.mapLoadingTimer);
+          this.mapLoadingTimer = null;
+        }
+      }
+    },
     initMapAndAnimate(startSteps, targetSteps) {
       if (this.mapWidth && this.mapHeight) {
         this.animateMapProgress(startSteps, targetSteps);
@@ -536,7 +576,7 @@ export default {
         const easeProgress = 1 - Math.pow(1 - progress, 3); // easeOutCubic
         
         this.drawnSteps = Math.floor(startValue + (endValue - startValue) * easeProgress);
-        this.drawMap();
+        this.drawMap(progress >= 1 ? () => this.markMapPieceReady('route') : null);
 
         if (progress < 1) {
           setTimeout(step, 16); // ~60fps
@@ -547,7 +587,7 @@ export default {
       };
       step();
     },
-    drawMap() {
+    drawMap(done = null) {
       if (!this.mapWidth || !this.mapHeight) return;
       const width = this.mapWidth;
       const height = this.mapHeight;
@@ -566,7 +606,9 @@ export default {
       // Second pass: Draw active (yellow) paths on top
       this.drawPathSegments(ctx, points, width, height, true);
       
-      ctx.draw();
+      ctx.draw(false, () => {
+        if (done) done();
+      });
     },
     computeUserPosition() {
       if (!this.mapWidth || !this.mapHeight || this.drawnSteps <= 0) {
@@ -849,6 +891,7 @@ export default {
       if (tab === 'period') {
         this.fetchLeaderboard();
       } else if (tab === 'today') {
+        if (!this.mapHasLoadedOnce) this.resetMapLoading();
         this.$nextTick(() => {
           setTimeout(() => {
             this.fetchAllTeamRouteTotals(true);
@@ -873,12 +916,12 @@ export default {
           },
           complete: () => {
             pending -= 1;
-            if (pending === 0) this.updateTeamRouteProgress(animated, previousProgress);
+            if (pending === 0) this.updateTeamRouteProgress(animated, previousProgress, () => this.markMapPieceReady('overlay'));
           }
         });
       });
     },
-    updateTeamRouteProgress(animated = true, startProgressOverride = null) {
+    updateTeamRouteProgress(animated = true, startProgressOverride = null, done = null) {
       const targetProgress = {};
       Object.keys(this.teamData).forEach(team => {
         const totalSteps = (this.teamRouteTotals[team] || 0) / 0.0007;
@@ -887,7 +930,7 @@ export default {
 
       if (!animated) {
         this.teamRouteProgress = { ...targetProgress };
-        this.drawTeamRouteOverlay(this.teamRouteProgress);
+        this.drawTeamRouteOverlay(this.teamRouteProgress, done);
         return;
       }
 
@@ -901,7 +944,7 @@ export default {
         Object.keys(targetProgress).forEach(team => {
           current[team] = startProgress[team] + (targetProgress[team] - startProgress[team]) * eased;
         });
-        this.drawTeamRouteOverlay(current);
+        this.drawTeamRouteOverlay(current, t < 1 ? null : done);
         if (t < 1) {
           setTimeout(step, 16);
         } else {
@@ -910,7 +953,7 @@ export default {
       };
       step();
     },
-    drawTeamRouteOverlay(progressByTeam = this.teamRouteProgress) {
+    drawTeamRouteOverlay(progressByTeam = this.teamRouteProgress, done = null) {
       const query = uni.createSelectorQuery().in(this);
       query.select('.map-image-section').boundingClientRect(rect => {
         if (!rect) return;
@@ -1134,8 +1177,8 @@ export default {
           const routePoints = getTeamRoutePoints(team);
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
-          const alpha = isMine ? 1 : 0.32;
-          const teamProgress = progressByTeam[team] || 0;
+          const alpha = 1;
+          const teamProgress = 1;
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
           const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [10, 26, 42, 58, 74] : (team === 'Team3' ? [4, 10, 16, 22, 28] : [18, 44, 70, 96, 122]));
@@ -1148,7 +1191,9 @@ export default {
             drawTeamCheckpoint(team, routePoints[routePoints.length - 1], alpha);
           }
         });
-        ctx.draw();
+        ctx.draw(false, () => {
+          if (done) done();
+        });
       }).exec();
     },
     fetchLeaderboard() {
@@ -1559,16 +1604,22 @@ page {
 .map-image-section {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   box-sizing: border-box;
   overflow: hidden;
   position: relative;
+  width: 100%;
+  min-width: 100%;
 }
 
 .map-image {
   width: 100%;
   height: 100%;
+  display: block;
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
 }
 
 .red-route-overlay-canvas {
@@ -1579,6 +1630,37 @@ page {
   height: 100%;
   z-index: 2;
   pointer-events: none;
+}
+
+.map-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.map-loading-spinner {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(45, 122, 74, 0.18);
+  border-top-color: #2d7a4a;
+  border-right-color: rgba(45, 122, 74, 0.7);
+  animation: spin 0.9s linear infinite;
+  margin-bottom: 18rpx;
+}
+
+.map-loading-text {
+  color: #2d6040;
+  font-size: 24rpx;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 /* this section was the main section display route code that has been set to display none */
@@ -1745,6 +1827,11 @@ page {
 @keyframes sonarPulse {
   0%   { transform: scale(1);   opacity: 0.8; }
   100% { transform: scale(3.5); opacity: 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .pulse-ring {
