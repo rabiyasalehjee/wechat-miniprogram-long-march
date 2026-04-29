@@ -1,9 +1,12 @@
 <template>
   <view class="app">
-    <image v-if="activeTab !== 'teams'" class="bg-image" src="/static/bg-img.png" mode="aspectFill" />
+    <image v-if="activeTab !== 'teams' && activeTab !== 'profile'" class="bg-image" src="/static/bg-img.png" mode="aspectFill" />
+    <view v-if="activeTab === 'profile'" class="profile-header-bar">
+      <text class="profile-header-title">个人中心</text>
+    </view>
 
     <!-- Top Nav Bar (hidden on teams tab) -->
-    <view v-if="activeTab !== 'teams'" class="top-nav">
+    <view v-if="activeTab !== 'teams' && activeTab !== 'profile'" class="top-nav">
       <view class="nav-left">
         <view class="nav-row-1">
           <text class="nav-yellow">今日步数：{{ todaysSteps }}</text>
@@ -269,6 +272,11 @@
         <text class="tab-text">团队</text>
         <view class="active-line" v-if="activeTab === 'teams'"></view>
       </view>
+      <view class="tab-divider"></view>
+      <view class="tab-item" @click="openPersonalCenter">
+        <text class="tab-text">个人中心</text>
+        <view class="active-line" v-if="activeTab === 'profile'"></view>
+      </view>
     </view>
 
     <!-- Team ID Dialog -->
@@ -329,6 +337,43 @@
       </view>
     </view>
 
+    <!-- Personal Center -->
+    <view v-if="activeTab === 'profile'" class="profile-wrapper">
+      <view class="profile-shell">
+        <view class="profile-identity" @click="!personalEditMode && startPersonalEdit()">
+          <button
+            v-if="personalEditMode"
+            class="profile-avatar-btn"
+            open-type="chooseAvatar"
+            @chooseavatar="onChooseAvatar"
+          >
+            <image class="profile-avatar" :src="tempAvatarUrl || userAvatarUrl || '/static/user.png'" mode="aspectFill" />
+          </button>
+          <view v-else class="profile-avatar-view">
+            <image class="profile-avatar" :src="personalDisplayAvatar" mode="aspectFill" />
+          </view>
+
+          <view class="profile-name-line" @click.stop="startPersonalEdit">
+            <text v-if="!personalEditMode" class="profile-name">{{ personalDisplayName }}</text>
+            <input
+              v-else
+              class="profile-name-input-inline"
+              type="text"
+              placeholder="输入新的昵称"
+              :value="tempNickname"
+              @input="onNicknameChange"
+              @focus="profileNameEditing = true"
+            />
+            <text class="profile-arrow">›</text>
+          </view>
+        </view>
+
+        <view v-if="personalEditMode" class="profile-edit-area">
+          <button class="profile-done-btn" @click="savePersonalProfile">done</button>
+        </view>
+      </view>
+    </view>
+
     <!-- Privacy Authorization Modal -->
     <view v-if="showPrivacyModal" class="modal-mask">
       <view class="privacy-box">
@@ -377,6 +422,8 @@ export default {
       showPrivacyModal: false,
       privacyResolve: null,
       showTeamDialog: false,
+      personalEditMode: false,
+      previousTab: 'today',
       teamIdInput: '',
       teamErrorMsg: '',
       myTeam: '',
@@ -478,6 +525,14 @@ export default {
       if (!nearest || minDist > 12) return 'top';
       const opposite = { left: 'right', right: 'left', top: 'bottom', bottom: 'top', 'bottom-left': 'right' };
       return opposite[nearest.pos] || 'top';
+    },
+    personalDisplayAvatar() {
+      const cached = uni.getStorageSync('userProfile') || {};
+      return this.userAvatarUrl || cached.avatarUrl || '/static/user.png';
+    },
+    personalDisplayName() {
+      const cached = uni.getStorageSync('userProfile') || {};
+      return this.userNickname || cached.nickname || '微信用户';
     }
   },
   mounted() {
@@ -872,6 +927,12 @@ export default {
       uni.setStorageSync('syncDays', this.syncDays);
     },
     switchTab(tab) {
+      if (tab === 'profile') {
+        this.previousTab = this.activeTab;
+        this.activeTab = 'profile';
+        this.personalEditMode = false;
+        return;
+      }
       this.activeTab = tab;
       if (tab === 'teams') {
         if (!this.myTeam) {
@@ -1236,6 +1297,97 @@ export default {
     onNicknameChange(e) {
       this.tempNickname = e.detail.value;
     },
+    openPersonalCenter() {
+      const cached = uni.getStorageSync('userProfile') || {};
+      this.tempNickname = this.userNickname || cached.nickname || '';
+      this.tempAvatarUrl = this.userAvatarUrl || cached.avatarUrl || '';
+      this.personalEditMode = false;
+      this.previousTab = this.activeTab;
+      this.activeTab = 'profile';
+    },
+    closePersonalCenter() {
+      this.personalEditMode = false;
+      this.activeTab = this.previousTab || 'today';
+    },
+    startPersonalEdit() {
+      const cached = uni.getStorageSync('userProfile') || {};
+      this.tempNickname = this.userNickname || cached.nickname || '';
+      this.tempAvatarUrl = this.userAvatarUrl || cached.avatarUrl || '';
+      this.personalEditMode = true;
+    },
+    cancelPersonalEdit() {
+      this.personalEditMode = false;
+      this.tempNickname = this.userNickname || (uni.getStorageSync('userProfile') || {}).nickname || '';
+      this.tempAvatarUrl = this.userAvatarUrl || (uni.getStorageSync('userProfile') || {}).avatarUrl || '';
+    },
+    savePersonalProfile() {
+      const name = (this.tempNickname || '').trim();
+      if (!name) {
+        uni.showToast({ title: '请填写昵称', icon: 'none' });
+        return;
+      }
+      uni.showLoading({ title: '保存中...' });
+      const avatar = this.tempAvatarUrl || this.userAvatarUrl || '';
+      if (avatar && avatar.startsWith('cloud://')) {
+        this._saveProfileToCloud(name, avatar);
+        return;
+      }
+      if (avatar && avatar.startsWith('http')) {
+        uni.showLoading({ title: '保存中...' });
+        uni.downloadFile({
+          url: avatar,
+          success: (dlRes) => {
+            this._uploadLocalAvatarAndSaveProfile(dlRes.tempFilePath, name);
+          },
+          fail: () => {
+            uni.hideLoading();
+            this._saveProfileToCloud(name, this.userAvatarUrl || '');
+          }
+        });
+        return;
+      }
+      if (avatar) {
+        this._uploadLocalAvatarAndSaveProfile(avatar, name);
+        return;
+      }
+      this._saveProfileToCloud(name, avatar);
+    },
+    _uploadLocalAvatarAndSaveProfile(localPath, nickname) {
+      const ext = localPath.split('.').pop().split('?')[0] || 'jpg';
+      const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      wx.cloud.uploadFile({
+        cloudPath,
+        filePath: localPath,
+        success: (uploadRes) => {
+          this._saveProfileToCloud(nickname, uploadRes.fileID);
+        },
+        fail: (err) => {
+          console.error('Profile avatar upload failed:', err);
+          uni.hideLoading();
+          this._saveProfileToCloud(nickname, this.userAvatarUrl || '');
+        }
+      });
+    },
+    _saveProfileToCloud(nickname, avatarUrl) {
+      const safeAvatar = (avatarUrl || '').startsWith('cloud://') ? avatarUrl : '';
+      this.userNickname = nickname;
+      this.userAvatarUrl = avatarUrl || '';
+      uni.setStorageSync('userProfile', { nickname, avatarUrl: avatarUrl || '' });
+      wx.cloud.callFunction({
+        name: 'getSteps',
+        data: { action: 'updateProfile', nickname, avatarUrl: safeAvatar },
+        complete: () => {
+          uni.hideLoading();
+          this.personalEditMode = false;
+          this.previousTab = 'profile';
+          this.tempNickname = nickname;
+          this.tempAvatarUrl = avatarUrl || '';
+          if (this.myTeam) this.fetchTeamData();
+          this.fetchLeaderboard();
+          uni.showToast({ title: '资料已更新', icon: 'success' });
+        }
+      });
+    },
     confirmProfile() {
       const name = this.tempNickname.trim();
       if (!name) {
@@ -1550,6 +1702,23 @@ page {
   box-sizing: border-box;
 }
 
+.profile-header-bar {
+  width: 100%;
+  height: 100rpx;
+  flex-shrink: 0;
+  background: #2c7c41;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.profile-header-title {
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
 .nav-left {
   display: flex;
   flex-direction: column;
@@ -1610,6 +1779,7 @@ page {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-bottom: 0;
 }
 
 .map-image-section {
@@ -1980,7 +2150,7 @@ page {
   flex-shrink: 0;
   position: relative;
   z-index: 1;
-  padding: 4rpx 0 0;
+  padding: 4rpx 0 calc(100rpx + env(safe-area-inset-bottom));
 }
 
 .stats-row {
@@ -2036,6 +2206,18 @@ page {
   height: 100rpx;
   padding-bottom: calc(env(safe-area-inset-bottom) / 2);
   flex-shrink: 0;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+}
+
+.tab2-wrapper,
+.tab3-wrapper,
+.profile-wrapper {
+  padding-bottom: calc(100rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .tab-item {
@@ -2171,6 +2353,228 @@ page {
   line-height: 80rpx;
 }
 .modal-cancel-btn::after {
+  border: none;
+}
+
+.center-box {
+  width: 640rpx;
+  padding: 40rpx 36rpx 36rpx;
+  border-radius: 30rpx;
+  background: linear-gradient(160deg, #1f5f37, #2c7c41);
+  box-shadow: 0 18rpx 56rpx rgba(0,0,0,0.36);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.center-top {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28rpx;
+}
+
+.center-avatar-frame {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 50%;
+  padding: 6rpx;
+  background: rgba(255,255,255,0.12);
+  box-sizing: border-box;
+  margin-bottom: 18rpx;
+}
+
+.center-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2rpx solid rgba(255,255,255,0.25);
+  background-color: rgba(255,255,255,0.08);
+}
+
+.center-name {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.center-team {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.68);
+}
+
+.center-actions,
+.center-edit-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.center-edit-btn,
+.center-close-btn {
+  width: 100%;
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 42rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.center-edit-btn {
+  background: #f5d76e;
+  color: #1a3a20;
+  margin-bottom: 14rpx;
+}
+.center-edit-btn::after {
+  border: none;
+}
+
+.center-close-btn {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.82);
+}
+.center-close-btn::after {
+  border: none;
+}
+
+.center-avatar-picker {
+  margin-bottom: 26rpx;
+}
+
+.center-nickname-input {
+  margin-bottom: 26rpx;
+}
+
+/* ── Profile Screen ── */
+.profile-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  overflow: hidden;
+  background: #2d6040;
+  padding: 36rpx 24rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.profile-shell {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  padding-top: 24rpx;
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.profile-avatar-view,
+.profile-avatar-btn {
+  width: 156rpx;
+  height: 156rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.10);
+}
+
+.profile-avatar-btn {
+  background: rgba(255,255,255,0.10);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.profile-avatar-btn::after {
+  border: none;
+}
+
+.profile-avatar-view {
+  margin-bottom: 20rpx;
+}
+
+.profile-name-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 20rpx;
+  box-sizing: border-box;
+  height: 72rpx;
+}
+
+.profile-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #ffffff;
+  max-width: 520rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-name-input-inline {
+  width: 360rpx;
+  height: 62rpx;
+  line-height: 62rpx;
+  padding: 0 18rpx;
+  border-radius: 14rpx;
+  border: 2rpx solid rgba(255,255,255,0.24);
+  background: rgba(255,255,255,0.14);
+  color: #ffffff;
+  font-size: 30rpx;
+  box-sizing: border-box;
+}
+
+.profile-name-input-inline::placeholder {
+  color: rgba(255,255,255,0.72);
+}
+
+.profile-arrow {
+  font-size: 42rpx;
+  color: rgba(255,255,255,0.95);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 10rpx;
+}
+
+.profile-edit-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 36rpx;
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.profile-done-btn {
+  width: 180rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  border-radius: 35rpx;
+  background: rgba(255,255,255,0.16);
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 700;
+  margin: 0 auto;
+}
+.profile-done-btn::after {
   border: none;
 }
 

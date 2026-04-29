@@ -123,6 +123,36 @@ exports.main = async (event, context) => {
     return { success: true }
   }
 
+  // ── Update profile only ──
+  if (event.action === 'updateProfile') {
+    const nickname = String(event.nickname || '').trim()
+    const avatarUrl = String(event.avatarUrl || '').trim()
+    const userRecord = await db.collection('userSteps').where({ _openid: openid }).get()
+
+    if (userRecord.data.length > 0) {
+      await db.collection('userSteps').doc(userRecord.data[0]._id).update({
+        data: {
+          nickname,
+          avatarUrl
+        }
+      })
+      return { success: true }
+    }
+
+    await db.collection('userSteps').add({
+      data: {
+        _openid: openid,
+        nickname,
+        avatarUrl,
+        todaySteps: 0,
+        totalSteps: 0,
+        dailySteps: {},
+        createdAt: db.serverDate()
+      }
+    })
+    return { success: true }
+  }
+
   // ── Fetch team data ──
   if (event.action === 'getTeamData') {
     const { teamName } = event
