@@ -17,7 +17,7 @@
     </view>
 
     <!-- Tab 1: 今日榜单 -->
-    <view v-if="activeTab === 'today'" class="tab1-wrapper">
+    <view v-show="activeTab === 'today'" class="tab1-wrapper">
       <view class="map-image-section">
         <image class="map-image" src="/static/map-img.png" mode="aspectFill" />
         <canvas
@@ -891,8 +891,14 @@ export default {
       if (tab === 'period') {
         this.fetchLeaderboard();
       } else if (tab === 'today') {
-        if (!this.mapHasLoadedOnce) this.resetMapLoading();
         this.$nextTick(() => {
+          if (this.mapHasLoadedOnce) {
+            this.drawnSteps = this.todaysSteps;
+            this.computeUserPosition();
+            this.drawMap();
+            this.fetchAllTeamRouteTotals(false);
+            return;
+          }
           setTimeout(() => {
             this.fetchAllTeamRouteTotals(true);
             this.drawnSteps = this.todaysSteps; // Snap directly on tab switch
@@ -988,10 +994,7 @@ export default {
               p(56.6, 48.9), p(58.6, 48.2), p(60.8, 47.7), p(63.0, 47.6),
               p(65.5, 47.8), p(69.0, 48.3), p(72.5, 48.5), p(76.0, 48.7),
               p(79.5, 48.9), p(83.6, 49.5), p(87.3, 50.6), p(90.1, 52.3),
-              p(91.9, 54.7), p(92.2, 57.3), p(91.1, 59.6), p(89.0, 61.6),
-              p(86.0, 63.1), p(85.0, 63.7), p(84.7, 64.3), p(85.3, 64.8),
-              p(86.8, 65.0), p(89.4, 65.2), p(108.0, 64.8), p(109.4, 64.1),
-              p(109.9, 63.6)
+              p(91.9, 54.7)
             ],
             Team2: [
               px(37.5, 77.5, 100), px(43, 72, 100), px(48, 80, 100), px(40, 86, 100),
@@ -1064,6 +1067,7 @@ export default {
               p(87.4, 94.4)
             ]
           };
+          if (team === 'Team1') return routes.Team1.map(pt => ({ x: pt.x + 24, y: pt.y }));
           if (team === 'Team3') return routes.Team3.slice().reverse();
           if (team === 'Team4') return routes.Team4.slice().reverse();
           return routes[team] || routes.Team1;
@@ -1177,11 +1181,11 @@ export default {
           const routePoints = getTeamRoutePoints(team);
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
-          const alpha = 1;
-          const teamProgress = 1;
+          const alpha = isMine ? 1 : 0.32;
+          const teamProgress = progressByTeam[team] || 0;
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
-          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [10, 26, 42, 58, 74] : (team === 'Team3' ? [4, 10, 16, 22, 28] : [18, 44, 70, 96, 122]));
+          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [10, 22, 34, 46, 58] : (team === 'Team3' ? [4, 10, 16, 22, 28] : [18, 44, 70, 96, 122]));
           routeDotIndexes.forEach(i => {
             if (!routePoints[i]) return;
             const dotIsFilled = teamProgress >= progressAtPoint(routePoints, i);
@@ -1500,15 +1504,18 @@ export default {
 page {
   height: 100%;
   overflow: hidden;
+  background-color: #2c7c41;
 }
 
 .app {
   height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #2c7c41;
 }
 
 .bg-image {
@@ -1518,6 +1525,7 @@ page {
   width: 100%;
   height: 100%;
   z-index: 0;
+  background-color: #2c7c41;
 }
 
 .top-nav,
@@ -1526,6 +1534,7 @@ page {
 .bottom-nav {
   position: relative;
   z-index: 1;
+  width: 100%;
 }
 
 /* ── Top Nav ── */
@@ -1537,6 +1546,8 @@ page {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .nav-left {
