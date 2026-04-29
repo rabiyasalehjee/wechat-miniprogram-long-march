@@ -36,7 +36,7 @@ This project, "Trail-1," is a Uni-App designed as a WeChat Mini Program to track
 
 *   **Themed Interface:** "Long March Steps" with a subtitle "Retrace the 25,000-li Long March Road."
 *   **Today's Steps:** Displays the user's step count for the current day.
-*   **Total Distance Tracking:** Calculates and shows the accumulated total mileage in kilometers, based on an average stride of 0.7 meters.
+*   **Total Distance Tracking:** Calculates and shows the accumulated total mileage in kilometers, based on an average stride of 0.5 meters.
 *   **Long March Progress:** Visualizes progress towards a 12,500-kilometer target with a progress bar, showing completion percentage and remaining distance.
 *   **Animated Live Map:** A simple map visualization with key waypoints (Ruijin, Zunyi, Yan'an) and an animated walker emoji representing the user's progress.
 *   **WeChat Integration:** Syncs step data directly from WeChat WeRun.

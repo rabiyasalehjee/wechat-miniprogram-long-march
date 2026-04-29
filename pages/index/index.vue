@@ -165,7 +165,6 @@
               <text class="team-total-km-unit">公里</text>
               <text class="team-total-km-label">团队总里程</text>
             </view>
-            <button v-if="myTeam" class="team-leave-btn" @click="leaveTeam">退出团队</button>
           </view>
         </view>
 
@@ -243,7 +242,7 @@
       <view class="stats-row">
         <view class="stats-cell">
           <text class="stats-label">兑换比例</text>
-          <text class="stats-value stats-small">1步 = 0.7米</text>
+          <text class="stats-value stats-small">1步 = 0.5米</text>
         </view>
         <view class="stats-cell">
           <text class="stats-label">累计里程</text>
@@ -434,6 +433,7 @@ export default {
       teamLoading: false,
       teamRouteTotals: { Team1: 0, Team2: 0, Team3: 0, Team4: 0 },
       teamRouteProgress: { Team1: 0, Team2: 0, Team3: 0, Team4: 0 },
+      teamRouteTargets: { Team1: 5000, Team2: 10000, Team3: 5000, Team4: 12500 },
       mapLoading: true,
       mapRenderReady: { route: false, overlay: false },
       mapLoadingTimer: null,
@@ -450,7 +450,7 @@ export default {
       teamData: {
         'Team1': ['21B908040','23B308006','23B908051','24B908021','25B308027','21B908014','22B908026','23B908033','25B908031','25B308018','22B908036'],
         'Team2': ['20B908016','20B908054','21B908043','22B908022','23B308002','23B908038','23B908056','24B308009','24B908037','24B908045','25B308017','20B908061','22B308004','24B908040','25B308008','24B308016','22B908019','18B908028','18B908088','19B908065','21B908039'],
-        'Team3': ['18B908105','20B908060','22B908035','22B908040','23B908031','24B908032','24B908041','23B908035','23B908061','25B308023','22B908037'],
+        'Team3': ['18B908105','20B908060','22B908035','22B908040','23B908031','24B908032','24B908041','23B908035','23B908061','25B308023','22B908037','20240093'],
         'Team4': ['19B908045','20B908059','20B908029','21B908038','21B908042','22B308007','22B908023','22B908044','23B908024','24B308008','26B308020','19B908063','19B908064','20B908022','22B908038','23B908022','24B908031','25B908046','26B308012','25B308022','25B908030','18B908014','19B908036','19B908046','20B908017','17B908042'],
       },
       // Map check points (1 to 13 based on the Long March route)
@@ -473,10 +473,12 @@ export default {
   },
   computed: {
     remainingSteps() {
-      const teamSteps = this.myTeam ? Math.floor((this.teamRouteTotals[this.myTeam] || 0) / 0.0007) : 0;
-      const currentSteps = this.myTeam ? teamSteps : this.todaysSteps;
-      const rem = this.stepTarget - currentSteps;
-      return (rem > 0 ? rem : 0).toLocaleString();
+      const M = 65000000;
+      const totalTeamKm = Object.keys(this.teamRouteTotals)
+        .reduce((sum, team) => sum + (Number(this.teamRouteTotals[team]) || 0), 0);
+      const H = totalTeamKm * 1000 / 0.5;
+      const X = M - H;
+      return (X > 0 ? Math.floor(X) : 0).toLocaleString();
     },
     daysLeft() {
       const now = new Date();
@@ -503,10 +505,10 @@ export default {
       return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
     },
     todayKm() {
-      return (this.todaysSteps * 0.0007).toFixed(2);
+      return (this.todaysSteps * 0.0005).toFixed(2);
     },
     totalKm() {
-      return (this.totalStepsHistory * 0.0007).toFixed(2);
+      return (this.totalStepsHistory * 0.0005).toFixed(2);
     },
     teamMembersSorted() {
       return [...this.teamMembers].sort((a, b) => b.cumulativeKm - a.cumulativeKm);
@@ -991,8 +993,9 @@ export default {
     updateTeamRouteProgress(animated = true, startProgressOverride = null, done = null) {
       const targetProgress = {};
       Object.keys(this.teamData).forEach(team => {
-        const totalSteps = (this.teamRouteTotals[team] || 0) / 0.0007;
-        targetProgress[team] = Math.min(1, totalSteps / this.stepTarget);
+        const totalKm = Number(this.teamRouteTotals[team]) || 0;
+        const targetKm = Number(this.teamRouteTargets[team]) || 1;
+        targetProgress[team] = Math.min(1, totalKm / targetKm);
       });
 
       if (!animated) {
@@ -1642,27 +1645,6 @@ export default {
     cancelTeamDialog() {
       this.showTeamDialog = false;
       if (!this.myTeam) this.activeTab = 'today';
-    },
-    leaveTeam() {
-      uni.showModal({
-        title: '退出团队',
-        content: '确定要退出当前团队吗？',
-        confirmText: '退出',
-        confirmColor: '#c0392b',
-        success: (res) => {
-          if (res.confirm) {
-            wx.cloud.callFunction({ name: 'getSteps', data: { action: 'clearTeamMember' } });
-            this.myTeam = '';
-            this.myStudentId = '';
-            uni.removeStorageSync('myTeam');
-            uni.removeStorageSync('myStudentId');
-            this.teamIdInput = '';
-            this.teamErrorMsg = '';
-            this.showTeamDialog = true;
-            this.drawTeamRouteOverlay();
-          }
-        }
-      });
     },
     sendToServer(code, encryptedData, iv, nickname, avatarUrl) {
       const that = this;
@@ -2744,20 +2726,6 @@ page {
   margin-top: 2rpx;
   text-align: right;
 }
-
-.team-leave-btn {
-  background: rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.5);
-  font-size: 22rpx;
-  border-radius: 30rpx;
-  border: 1rpx solid rgba(255,255,255,0.2);
-  height: 56rpx;
-  line-height: 56rpx;
-  padding: 0 24rpx;
-  flex-shrink: 0;
-  margin-left: 16rpx;
-}
-.team-leave-btn::after { border: none; }
 
 .team-total-km-label {
   font-size: 20rpx;

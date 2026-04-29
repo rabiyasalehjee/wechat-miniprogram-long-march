@@ -1,7 +1,7 @@
 const assert = require('assert');
 
 // The logic we want to test
-function calculateDistanceKm(steps, stepToMeter = 0.7) {
+function calculateDistanceKm(steps, stepToMeter = 0.5) {
   return (steps * stepToMeter) / 1000;
 }
 

@@ -10,13 +10,13 @@ const _ = db.command
 const APP_ID = 'wx818c547cafacca28'
 const APP_SECRET = '3b7041693e8d08239ab1aef5c3a84056'
 
-const METERS_PER_STEP = 0.7
+const METERS_PER_STEP = 0.5
 const STEPS_PER_KM = 1000 / METERS_PER_STEP // 1428.57
 
 const TEAM_DATA = {
   'Team1': ['21B908040','23B308006','23B908051','24B908021','25B308027','21B908014','22B908026','23B908033','25B908031','25B308018','22B908036'],
   'Team2': ['20B908016','20B908054','21B908043','22B908022','23B308002','23B908038','23B908056','24B308009','24B908037','24B908045','25B308017','20B908061','22B308004','24B908040','25B308008','24B308016','22B908019','18B908028','18B908088','19B908065','21B908039'],
-  'Team3': ['18B908105','20B908060','22B908035','22B908040','23B908031','24B908032','24B908041','23B908035','23B908061','25B308023','22B908037'],
+  'Team3': ['18B908105','20B908060','22B908035','22B908040','23B908031','24B908032','24B908041','23B908035','23B908061','25B308023','22B908037','20240093'],
   'Team4': ['19B908045','20B908059','20B908029','21B908038','21B908042','22B308007','22B908023','22B908044','23B908024','24B308008','26B308020','19B908063','19B908064','20B908022','22B908038','23B908022','24B908031','25B908046','26B308012','25B308022','25B908030','18B908014','19B908036','19B908046','20B908017','17B908042'],
 }
 
@@ -107,17 +107,6 @@ exports.main = async (event, context) => {
     } else {
       await db.collection('userSteps').add({
         data: { _openid: openid, studentId, todaySteps: 0, totalSteps: 0, dailySteps: {}, createdAt: db.serverDate() }
-      })
-    }
-    return { success: true }
-  }
-
-  // ── Unlink student ID from this user ──
-  if (event.action === 'clearTeamMember') {
-    const userRecord = await db.collection('userSteps').where({ _openid: openid }).get()
-    if (userRecord.data.length > 0) {
-      await db.collection('userSteps').doc(userRecord.data[0]._id).update({
-        data: { studentId: _.remove() }
       })
     }
     return { success: true }
