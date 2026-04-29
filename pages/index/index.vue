@@ -962,19 +962,17 @@ export default {
               p(42, 11)
             ],
             Team3: [
-              p(42.0, 32.9), p(55.2, 33.8),
-              p(52.4, 34.4), p(48.4, 34.8), p(44.5, 34.9), p(41.0, 35.2),
-              p(38.1, 35.9), p(36.9, 36.9), p(37.1, 38.0), p(38.4, 38.9),
-              p(40.8, 39.6), p(43.1, 39.5), p(44.5, 38.9), p(45.1, 37.9),
-              p(45.0, 36.6), p(43.8, 38.4), p(41.8, 40.1), p(38.8, 41.6),
-              p(35.0, 42.7), p(30.7, 43.7), p(26.7, 44.6), p(23.2, 45.8),
-              p(20.1, 47.1), p(17.6, 48.9), p(15.9, 51.0), p(14.6, 53.2),
-              p(13.2, 55.4), p(16.3, 54.8), p(19.7, 54.5), p(23.1, 54.7),
-              p(26.5, 55.4), p(29.5, 56.9), p(31.3, 58.7), p(31.6, 60.7),
-              p(30.2, 62.7), p(28.3, 64.4), p(27.0, 66.0), p(26.9, 67.6),
-              p(28.6, 69.1), p(32.3, 70.2), p(36.8, 70.3), p(41.7, 69.8),
-              p(46.6, 69.1), p(51.3, 68.6), p(55.7, 68.5), p(59.8, 68.9),
-              p(63.6, 69.8), p(66.7, 70.8), p(69.9, 71.6)
+              p(57.3, 24.9), p(55.2, 25.8),
+              p(52.4, 26.4), p(48.4, 26.8), p(44.5, 26.9), p(41.0, 27.2),
+              p(38.1, 27.9), p(36.9, 28.9), p(37.1, 30.0), p(38.4, 30.9),
+              p(40.8, 31.6), p(43.1, 31.5), p(44.5, 30.9), p(45.1, 29.9),
+              p(45.0, 28.6), p(43.8, 30.4), p(41.8, 32.1), p(38.8, 33.6),
+              p(35.0, 34.7), p(30.7, 35.7), p(26.7, 36.6), p(23.2, 37.8),
+              p(20.1, 39.1), p(17.6, 40.9), p(15.9, 43.0), p(14.6, 45.2),
+              p(13.2, 47.4), p(16.3, 46.8), p(19.7, 46.5), p(23.1, 46.7),
+              p(26.5, 47.4), p(29.5, 48.9), p(31.3, 50.7), p(31.6, 52.7),
+              p(30.2, 54.7), p(28.3, 56.4), p(27.0, 58.0), p(26.9, 59.6),
+              p(28.6, 61.1), p(32.3, 62.2)
             ],
             Team4: [
               p(54.9, 22.8), p(54.0, 21.0), p(52.7, 19.4), p(51.0, 18.4),
@@ -1023,6 +1021,7 @@ export default {
               p(87.4, 94.4)
             ]
           };
+          if (team === 'Team3') return routes.Team3.slice().reverse();
           if (team === 'Team4') return routes.Team4.slice().reverse();
           return routes[team] || routes.Team1;
         };
@@ -1135,11 +1134,11 @@ export default {
           const routePoints = getTeamRoutePoints(team);
           const teamColor = this.teamColors[team].primary;
           const isMine = this.myTeam === team;
-          const alpha = team === 'Team3' ? 1 : (isMine ? 1 : 0.32);
-          const teamProgress = team === 'Team3' ? 1 : (progressByTeam[team] || 0);
+          const alpha = isMine ? 1 : 0.32;
+          const teamProgress = progressByTeam[team] || 0;
           const partial = pointAtProgress(routePoints, teamProgress);
           drawPath(partial, isMine ? 3.2 : 2.5, rgba(teamColor, alpha));
-          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [10, 26, 42, 58, 74] : (team === 'Team3' ? [5, 12, 19, 26, 33] : [18, 44, 70, 96, 122]));
+          const routeDotIndexes = team === 'Team2' ? [6, 12, 18, 24, 30] : (team === 'Team1' ? [10, 26, 42, 58, 74] : (team === 'Team3' ? [4, 10, 16, 22, 28] : [18, 44, 70, 96, 122]));
           routeDotIndexes.forEach(i => {
             if (!routePoints[i]) return;
             const dotIsFilled = teamProgress >= progressAtPoint(routePoints, i);
