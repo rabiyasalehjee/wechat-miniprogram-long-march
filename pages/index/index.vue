@@ -24,6 +24,7 @@
       <view class="map-image-section">
         <image class="map-image" src="/static/map-img.jpg" mode="aspectFill" />
         <canvas
+          v-if="!showProfileModal"
           canvas-id="redRouteOverlayCanvas"
           id="redRouteOverlayCanvas"
           class="red-route-overlay-canvas"
@@ -1457,20 +1458,26 @@ export default {
       }
       this.userNickname = name;
       this.showProfileModal = false;
-      
+
       // Redraw map after modal closes (since v-if destroyed the canvas)
       this.$nextTick(() => {
-        setTimeout(() => this.drawMap(), 300);
+        setTimeout(() => {
+          this.drawMap();
+          this.updateTeamRouteProgress(false);
+        }, 300);
       });
-      
+
       this.uploadAvatarAndSync(this.tempAvatarUrl, name);
     },
     cancelProfile() {
       this.showProfileModal = false;
-      
+
       // Redraw map after modal closes
       this.$nextTick(() => {
-        setTimeout(() => this.drawMap(), 300);
+        setTimeout(() => {
+          this.drawMap();
+          this.updateTeamRouteProgress(false);
+        }, 300);
       });
     },
     syncWeRunData() {
