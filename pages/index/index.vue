@@ -243,7 +243,7 @@
       <view class="stats-row">
         <view class="stats-cell">
           <text class="stats-label">兑换比例</text>
-          <text class="stats-value stats-small">1步 = 0.5米</text>
+          <text class="stats-value stats-small">1步 = 0.7米</text>
         </view>
         <view class="stats-cell">
           <text class="stats-label">累计里程</text>
@@ -474,10 +474,10 @@ export default {
   },
   computed: {
     remainingSteps() {
-      const M = 65000000;
+      const M = 46428571;
       const totalTeamKm = Object.keys(this.teamRouteTotals)
         .reduce((sum, team) => sum + (Number(this.teamRouteTotals[team]) || 0), 0);
-      const H = totalTeamKm * 1000 / 0.5;
+      const H = totalTeamKm * 1000 / 0.7;
       const X = M - H;
       return (X > 0 ? Math.floor(X) : 0).toLocaleString();
     },
@@ -506,10 +506,10 @@ export default {
       return (this.drawnSteps % stepsPerSegment) / stepsPerSegment;
     },
     todayKm() {
-      return (this.todaysSteps * 0.0005).toFixed(2);
+      return (this.todaysSteps * 0.0007).toFixed(2);
     },
     totalKm() {
-      return (this.totalStepsHistory * 0.0005).toFixed(2);
+      return (this.totalStepsHistory * 0.0007).toFixed(2);
     },
     teamMembersSorted() {
       return [...this.teamMembers].sort((a, b) => b.cumulativeKm - a.cumulativeKm);

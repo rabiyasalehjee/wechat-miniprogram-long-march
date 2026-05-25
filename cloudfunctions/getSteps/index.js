@@ -10,7 +10,7 @@ const _ = db.command
 const APP_ID = 'wx818c547cafacca28'
 const APP_SECRET = '3b7041693e8d08239ab1aef5c3a84056'
 
-const METERS_PER_STEP = 0.5
+const METERS_PER_STEP = 0.7
 const STEPS_PER_KM = 1000 / METERS_PER_STEP // 1428.57
 
 const TEAM_DATA = {
