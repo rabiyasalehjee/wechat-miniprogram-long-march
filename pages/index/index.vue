@@ -13,7 +13,12 @@
           <text class="nav-yellow nav-gap">今日排名：{{ todayRank }}</text>
         </view>
         <view class="nav-row-2">
-          <text class="nav-yellow nav-hint">距离延安还有{{ remainingSteps }}步，继续加油！</text>
+          <view class="team-progress">
+            <view class="team-progress-bar">
+              <view class="team-progress-fill" :style="{ width: teamProgressPercent + '%' }"></view>
+            </view>
+            <text class="team-progress-label">{{ teamStepsTaken.toLocaleString() }} / {{ teamTargetSteps.toLocaleString() }} 步</text>
+          </view>
         </view>
       </view>
       <button class="sync-btn" @click="syncWeRunData">同步微信步数</button>
@@ -399,6 +404,7 @@ export default {
     return {
       todaysSteps: 0,
       totalStepsHistory: 0,
+      cloudCumulativeSteps: null,
       stepTarget: 150000,
       todayRank: '无',
       userPosition: null,
@@ -481,6 +487,19 @@ export default {
       const X = M - H;
       return (X > 0 ? Math.floor(X) : 0).toLocaleString();
     },
+    teamStepsTaken() {
+      const totalTeamKm = Object.keys(this.teamRouteTotals)
+        .reduce((sum, team) => sum + (Number(this.teamRouteTotals[team]) || 0), 0);
+      return Math.floor(totalTeamKm * 1000 / 0.7);
+    },
+    teamTargetSteps() {
+      return 46428571;
+    },
+    teamProgressPercent() {
+      if (this.teamTargetSteps <= 0) return 0;
+      const pct = (this.teamStepsTaken / this.teamTargetSteps) * 100;
+      return Math.max(0, Math.min(100, pct));
+    },
     daysLeft() {
       const now = new Date();
       const diff = this.endDate - now;
@@ -509,7 +528,12 @@ export default {
       return (this.todaysSteps * 0.0007).toFixed(2);
     },
     totalKm() {
-      return (this.totalStepsHistory * 0.0007).toFixed(2);
+      // Prefer the live cloud cumulative (same source/rounding as the teams list);
+      // fall back to the locally cached total before the cloud value loads.
+      const steps = this.cloudCumulativeSteps !== null
+        ? this.cloudCumulativeSteps
+        : this.totalStepsHistory;
+      return (steps * 0.0007).toFixed(1);
     },
     teamMembersSorted() {
       return [...this.teamMembers].sort((a, b) => b.cumulativeKm - a.cumulativeKm);
@@ -545,6 +569,7 @@ export default {
       this.showPrivacyModal = true;
     });
     this.loadLocalData();
+    this.fetchMyStats();
     // Load team assignment
     const savedTeam = uni.getStorageSync('myTeam');
     const savedId = uni.getStorageSync('myStudentId');
@@ -922,6 +947,17 @@ export default {
       const savedDays = uni.getStorageSync('syncDays');
       if (savedDays) this.syncDays = parseInt(savedDays, 10);
     },
+    fetchMyStats() {
+      wx.cloud.callFunction({
+        name: 'getSteps',
+        data: { action: 'getMyStats' },
+        success: (res) => {
+          if (res.result && res.result.success) {
+            this.cloudCumulativeSteps = res.result.cumulativeSteps || 0;
+          }
+        }
+      });
+    },
     saveData() {
       uni.setStorageSync('totalStepsHistory', this.totalStepsHistory);
       uni.setStorageSync('todaysSteps', this.todaysSteps);
@@ -992,11 +1028,17 @@ export default {
       });
     },
     updateTeamRouteProgress(animated = true, startProgressOverride = null, done = null) {
+      // Progress indicator for each route = (X - A) / B
+      // A = 2026-05-04 (start), B = 2026-10-22 (end), X = the specific day.
+      const A = new Date('2026-05-04T00:00:00').getTime();
+      const B = new Date('2026-10-22T23:59:59').getTime();
+      const X = Date.now();
+      const elapsed = (B - A) > 0 ? (X - A) / (B - A) : 0;
+      const timeProgress = Math.max(0, Math.min(1, elapsed));
+
       const targetProgress = {};
       Object.keys(this.teamData).forEach(team => {
-        const totalKm = Number(this.teamRouteTotals[team]) || 0;
-        const targetKm = Number(this.teamRouteTargets[team]) || 1;
-        targetProgress[team] = Math.min(1, totalKm / targetKm);
+        targetProgress[team] = timeProgress;
       });
 
       if (!animated) {
@@ -1667,6 +1709,7 @@ export default {
             that.todaysSteps = res.result.todaySteps;
             if (typeof res.result.totalSteps === 'number') {
               that.totalStepsHistory = res.result.totalSteps;
+              that.cloudCumulativeSteps = res.result.totalSteps;
             } else {
               that.totalStepsHistory = Math.max(0, that.totalStepsHistory - oldSteps + that.todaysSteps);
             }
@@ -1806,6 +1849,34 @@ page {
   font-size: 24rpx;
   color: #ffffff;
   line-height: 1.2;
+}
+
+.team-progress {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.team-progress-bar {
+  width: 100%;
+  height: 16rpx;
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 8rpx;
+  overflow: hidden;
+}
+
+.team-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f5d76e, #ffb300);
+  border-radius: 8rpx;
+  transition: width 1.2s ease-out;
+}
+
+.team-progress-label {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #ffffff;
+  font-weight: 500;
 }
 
 .sync-btn {

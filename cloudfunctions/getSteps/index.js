@@ -142,6 +142,18 @@ exports.main = async (event, context) => {
     return { success: true }
   }
 
+  // ── Fetch current user's live cumulative steps ──
+  if (event.action === 'getMyStats') {
+    const userRecord = await db.collection('userSteps').where({ _openid: openid }).get()
+    if (userRecord.data.length === 0) {
+      return { success: true, cumulativeSteps: 0, todaySteps: 0 }
+    }
+    const dailySteps = userRecord.data[0].dailySteps || {}
+    const cumulativeSteps = Object.values(dailySteps).reduce((a, b) => a + b, 0)
+    const todaySteps = dailySteps[dateKey()] || 0
+    return { success: true, cumulativeSteps, todaySteps }
+  }
+
   // ── Fetch team data ──
   if (event.action === 'getTeamData') {
     const { teamName } = event
